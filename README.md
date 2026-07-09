@@ -4,8 +4,8 @@ Your Touch Bar, Your Workflow.
 
 Turn your MacBook Touch Bar into a smart file shelf.
 
-[![Download ShelfBar](https://img.shields.io/badge/Download-ShelfBar.dmg-007AFF?style=for-the-badge&logo=apple)](https://github.com/seannb/ShelfBar/releases/tag/v1.0.0-beta.1)
-[![Version](https://img.shields.io/badge/version-v1.0.0--beta.1-111111?style=for-the-badge)](https://github.com/seannb/ShelfBar/releases/tag/v1.0.0-beta.1)
+[![Download ShelfBar](https://img.shields.io/badge/Download-ShelfBar.dmg-007AFF?style=for-the-badge&logo=apple)](https://github.com/chenyouxiang0810-gif/ShelfBar/releases/tag/v1.0.0-beta.1)
+[![Version](https://img.shields.io/badge/version-v1.0.0--beta.1-111111?style=for-the-badge)](https://github.com/chenyouxiang0810-gif/ShelfBar/releases/tag/v1.0.0-beta.1)
 [![License](https://img.shields.io/badge/license-Proprietary-lightgrey?style=for-the-badge)](LICENSE)
 
 ShelfBar is a native macOS AppKit utility for Intel MacBook Pro models with Touch Bar. Drop files, images, text and URLs into a Touch Bar shelf, organize them into stacks, and drag files back out to Finder when you need them.
