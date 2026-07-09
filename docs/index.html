@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShelfBar — Your Touch Bar, Your Workflow.</title>
+  <meta name="description" content="Turn your MacBook Touch Bar into a smart file shelf.">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f6f8;
+      --panel: rgba(255,255,255,.78);
+      --text: #101114;
+      --muted: #6b7280;
+      --line: rgba(0,0,0,.08);
+      --blue: #007aff;
+      --shadow: 0 24px 70px rgba(20, 32, 56, .14);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #080a0f;
+        --panel: rgba(22,24,30,.78);
+        --text: #f5f7fb;
+        --muted: #a3adbd;
+        --line: rgba(255,255,255,.1);
+        --shadow: 0 24px 70px rgba(0,0,0,.38);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(0,122,255,.16), transparent 32rem),
+        var(--bg);
+      color: var(--text);
+    }
+    a { color: inherit; }
+    .wrap { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 28px 0;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 20px; }
+    .brand img { width: 42px; height: 42px; border-radius: 12px; }
+    nav { display: flex; gap: 18px; color: var(--muted); font-size: 14px; }
+    .hero {
+      padding: 82px 0 56px;
+      text-align: center;
+    }
+    .hero img.icon { width: 96px; height: 96px; border-radius: 24px; box-shadow: var(--shadow); }
+    h1 { font-size: clamp(48px, 8vw, 86px); letter-spacing: -0.06em; margin: 26px 0 10px; }
+    .tagline { font-size: clamp(21px, 3vw, 32px); color: var(--muted); margin: 0 0 28px; }
+    .actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 13px 20px;
+      border-radius: 999px;
+      background: var(--blue);
+      color: white;
+      font-weight: 650;
+      text-decoration: none;
+      box-shadow: 0 10px 28px rgba(0,122,255,.28);
+    }
+    .button.secondary {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+    section { padding: 44px 0; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+    .card {
+      background: var(--panel);
+      backdrop-filter: blur(24px);
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+    .card img { width: 100%; border-radius: 22px; display: block; }
+    .touchbar-shot {
+      background: #05070b;
+      padding: 18px;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+    }
+    .touchbar-shot img {
+      border-radius: 12px;
+    }
+    h2 { font-size: 38px; letter-spacing: -0.04em; margin: 0 0 18px; }
+    h3 { font-size: 24px; letter-spacing: -0.03em; margin: 20px 0 10px; }
+    p, li { color: var(--muted); line-height: 1.62; }
+    ul.clean { list-style: none; padding: 0; display: grid; gap: 10px; }
+    ul.clean li::before { content: "✓"; color: var(--blue); font-weight: 800; margin-right: 8px; }
+    .feature-list { columns: 2; }
+    .faq { display: grid; gap: 14px; }
+    footer { color: var(--muted); padding: 60px 0 40px; border-top: 1px solid var(--line); margin-top: 40px; }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+      nav { display: none; }
+      .feature-list { columns: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <img src="assets/shelfbar-icon-dark.png" alt="ShelfBar icon">
+        <span>ShelfBar</span>
+      </div>
+      <nav>
+        <a href="#features">Features</a>
+        <a href="#download">Download</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/seannb/ShelfBar">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <img class="icon" src="assets/shelfbar-icon-dark.png" alt="ShelfBar">
+        <h1>ShelfBar</h1>
+        <p class="tagline">Your Touch Bar, Your Workflow.</p>
+        <p>Turn your MacBook Touch Bar into a smart file shelf.</p>
+        <div class="actions">
+          <a class="button" href="https://github.com/seannb/ShelfBar/releases/tag/v1.0.0-beta.1">Download Beta</a>
+          <a class="button secondary" href="https://github.com/seannb/ShelfBar">View on GitHub</a>
+        </div>
+      </section>
+
+      <section id="features">
+        <h2>Features</h2>
+        <div class="grid">
+          <article class="card">
+            <div class="touchbar-shot">
+              <img src="assets/feature-drop-zone.png" alt="Touch Bar Drop Zone">
+            </div>
+            <h3>Touch Bar Drop Zone</h3>
+            <p>Drop files, images, text and URLs from macOS apps into a live Touch Bar shelf, or send supported items directly to AirDrop.</p>
+          </article>
+          <article class="card">
+            <div class="touchbar-shot">
+              <img src="assets/feature-touchbar-shelf.png" alt="Touch Bar Shelf">
+            </div>
+            <h3>Touch Bar Shelf</h3>
+            <p>Keep files on the Touch Bar, stack them, reorder them, and drag them back out to Finder with native file copy behavior.</p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Why ShelfBar?</h2>
+        <ul class="clean feature-list">
+          <li>Universal Drop</li>
+          <li>Folder Stack</li>
+          <li>Nested Stack</li>
+          <li>Native Finder Icons</li>
+          <li>QuickLook Thumbnail</li>
+          <li>AirDrop Zone</li>
+          <li>Dock-like Drag</li>
+          <li>Floating Shelf Button</li>
+          <li>Touch Bar Animation</li>
+          <li>Menu Bar Mode</li>
+          <li>Auto Hide Dock</li>
+          <li>Light / Dark Theme</li>
+          <li>Drag Back Out</li>
+          <li>MouseBridge</li>
+          <li>Temporary Item Cleanup</li>
+        </ul>
+      </section>
+
+      <section id="download" class="card">
+        <h2>Download</h2>
+        <p>ShelfBar v1.0 beta is prepared for GitHub Releases. Download the DMG, open it, then drag ShelfBar to Applications.</p>
+        <div class="actions" style="justify-content:flex-start">
+          <a class="button" href="https://github.com/seannb/ShelfBar/releases/tag/v1.0.0-beta.1">Download ShelfBar.dmg</a>
+          <a class="button secondary" href="https://github.com/seannb/ShelfBar/blob/main/README.md#troubleshooting">Gatekeeper help</a>
+        </div>
+      </section>
+
+      <section id="faq">
+        <h2>FAQ</h2>
+        <div class="faq">
+          <article>
+            <h3>What Macs are supported?</h3>
+            <p>Intel MacBook Pro models with a physical Touch Bar, running macOS 15.7 or later.</p>
+          </article>
+          <article>
+            <h3>Does it work without Touch Bar?</h3>
+            <p>You can open the app window and settings on Macs without Touch Bar, but the main Shelf experience requires physical Touch Bar hardware.</p>
+          </article>
+          <article>
+            <h3>How do I remove temporary items?</h3>
+            <p>Removing a ShelfBar-generated temporary item also removes its local temporary file. Original Finder files are never deleted.</p>
+          </article>
+          <article>
+            <h3>Why do I see the Apple verification warning?</h3>
+            <img src="assets/gatekeeper-warning.png" alt="macOS Gatekeeper warning for ShelfBar" style="width:min(100%, 380px); border-radius:24px; box-shadow: var(--shadow); margin: 8px 0 12px;">
+            <p>The current beta has not yet been Apple notarized. Use System Settings → Privacy & Security → Open Anyway only if you downloaded ShelfBar from the official GitHub Release.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>© 2026 ShelfBar. All rights reserved.</p>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,2 @@
+44ccc084e23aee29fa6c1064564e548201e35bd7eb88847b0c77169cb4f41c6f  build/Release/ShelfBar.dmg
+ac866fa2e6eb5fd18cf69b21441dad7d8e165fdd528031dc9d8ee9eb824e3078  build/Release/ShelfBar.zip

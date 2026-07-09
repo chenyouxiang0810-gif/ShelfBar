@@ -1,0 +1,13 @@
+.DS_Store
+*.xcuserstate
+xcuserdata/
+DerivedData/
+build/
+ResearchSources/
+build/dmg-python/
+build/dmg-stage/
+build/**/*.tmp.dmg
+*.zip
+*.dmg
+*.xcarchive
+*.log
