@@ -10,7 +10,8 @@ ShelfBar is a native macOS utility for Intel MacBook Pro models with a physical 
 
 ## Website
 
-- Product site: https://shelfbar.seanchen810.chatgpt.site
+- Product site: https://chenyouxiang0810-gif.github.io/ShelfBar/
+- Private Sites preview: https://shelfbar.seanchen810.chatgpt.site
 - GitHub repository: https://github.com/chenyouxiang0810-gif/ShelfBar
 - Latest DMG: https://github.com/chenyouxiang0810-gif/ShelfBar/releases/latest/download/ShelfBar.dmg
 
