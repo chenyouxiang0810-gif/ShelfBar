@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ShelfBar</title>
+    <meta
+      name="description"
+      content="ShelfBar turns the Touch Bar into a workspace for files, clips, search, stacks, and pinned work."
+    >
+    <link rel="icon" href="assets/shelfbar-brand-dark.png">
+    <link rel="stylesheet" href="styles.css?v=touchbar-20260906-006">
+  </head>
+  <body>
+    <header class="site-header" aria-label="ShelfBar navigation">
+      <a class="brand" href="#top" aria-label="ShelfBar home">
+        <img src="assets/shelfbar-brand-dark.png" alt="" width="28" height="28">
+        <span>ShelfBar</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#highlight">Highlight</a>
+        <a href="#in-the-app">In the app</a>
+        <a href="#touchbar">Touch bar</a>
+        <a href="#qa">Q&amp;A</a>
+      </nav>
+      <a class="nav-cta" href="assets/downloads/ShelfBar.dmg?v=stabilityfix9-iconfix" download="ShelfBar.dmg">Download</a>
+    </header>
+
+    <main id="top">
+      <section class="hero page-section" aria-labelledby="hero-title">
+        <div class="section-inner hero-inner">
+          <div class="hero-copy reveal">
+            <h1 id="hero-title" class="hero-logo-title">
+              <img src="assets/shelfbar-brand-dark.png" alt="" width="112" height="112">
+              <span>ShelfBar</span>
+            </h1>
+            <p class="hero-line">Files, clips, search, stacks, and pinned work stay one touch away.</p>
+            <div class="button-row">
+              <a class="button button-primary" href="assets/downloads/ShelfBar.dmg?v=stabilityfix9-iconfix" download="ShelfBar.dmg">Download for macOS</a>
+              <a class="button button-secondary" href="https://github.com/chenyouxiang0810-gif/ShelfBar">GitHub</a>
+            </div>
+          </div>
+
+          <div class="hero-product reveal" data-product-stage data-variant="hero" data-feature="files">
+            <figure class="app-shot stage-app" data-app-frame>
+              <img data-app-image src="assets/app-pages/shelf.png" alt="ShelfBar app settings window">
+            </figure>
+            <figure class="touchbar-shot stage-touchbar" data-touchbar-frame>
+              <video data-touchbar-video muted loop playsinline preload="metadata" aria-hidden="true"></video>
+              <img data-touchbar-image src="assets/touchbar/files.png?v=touchbar-20260906-006" alt="ShelfBar Files on a real Touch Bar">
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="highlight page-section" id="highlight" aria-labelledby="highlight-title">
+        <div class="section-inner highlight-inner">
+          <p class="eyebrow reveal">ShelfBar</p>
+          <div class="highlight-title-wrap reveal" data-highlight-trigger>
+            <h2 id="highlight-title">
+              <span class="highlight-word">
+                <svg class="highlighter-svg" viewBox="0 0 1000 260" preserveAspectRatio="none" aria-hidden="true">
+                  <defs>
+                    <mask id="marker-reveal">
+                      <rect class="highlighter-mask-rect" x="0" y="0" width="0" height="260" rx="84" fill="white"></rect>
+                    </mask>
+                  </defs>
+                  <g mask="url(#marker-reveal)">
+                    <rect class="highlighter-shadow" x="0" y="116" width="1000" height="116" rx="58"></rect>
+                    <rect class="highlighter-stroke" x="16" y="102" width="968" height="112" rx="56"></rect>
+                  </g>
+                </svg>
+                <span>Highlight</span>
+              </span>
+            </h2>
+          </div>
+          <p class="highlight-note reveal">Mark what matters on the Touch Bar, keep it visible, and stay inside the app you are already using.</p>
+
+          <div class="highlights-stage" data-carousel>
+            <div class="carousel-viewport">
+              <div class="carousel-panel">
+                <div class="carousel-copy" aria-live="polite">
+                  <p class="eyebrow" data-carousel-eyebrow>Files</p>
+                  <h3 data-carousel-title>Files.</h3>
+                  <p data-carousel-copy>Drop files into ShelfBar and reopen them from the Touch Bar.</p>
+                </div>
+
+                <div class="carousel-product" data-product-stage data-variant="feature" data-feature="files" data-carousel-stage>
+                  <figure class="touchbar-shot stage-touchbar" data-touchbar-frame>
+                    <video data-touchbar-video muted loop playsinline preload="metadata" aria-hidden="true"></video>
+                    <img data-touchbar-image src="assets/touchbar/files.png?v=touchbar-20260906-006" alt="ShelfBar Files on a real Touch Bar">
+                  </figure>
+                  <figure class="app-shot stage-app" data-app-frame>
+                    <img data-app-image src="assets/app-pages/shelf.png" alt="ShelfBar app window">
+                  </figure>
+                </div>
+              </div>
+            </div>
+
+            <div class="carousel-controls" aria-label="Highlight playback">
+              <button class="circle-button" type="button" data-carousel-prev aria-label="Previous highlight"><span aria-hidden="true"></span></button>
+              <button class="play-button" type="button" data-carousel-toggle aria-label="Pause highlights">
+                <span class="playback-icon" aria-hidden="true"></span>
+                <span data-carousel-state>Pause</span>
+              </button>
+              <button class="circle-button" type="button" data-carousel-next aria-label="Next highlight"><span aria-hidden="true"></span></button>
+              <div class="progress-track" aria-hidden="true"><span data-carousel-progress></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="workflow page-section" id="in-the-app" aria-labelledby="in-app-title">
+        <div class="section-inner workflow-inner">
+          <div class="section-heading reveal">
+            <p class="eyebrow">ShelfBar settings</p>
+            <h2 id="in-app-title">In the app</h2>
+            <p>Set files, clips, search, appearance, shortcuts, and shelf behavior from one quiet macOS window.</p>
+          </div>
+
+          <div class="app-tabs" data-app-tabs>
+            <div class="segmented-nav" role="tablist" aria-label="ShelfBar app sections">
+              <button type="button" role="tab" aria-selected="true" data-app-tab="general">General</button>
+              <button type="button" role="tab" aria-selected="false" data-app-tab="appearance">Appearance</button>
+              <button type="button" role="tab" aria-selected="false" data-app-tab="features">Features</button>
+              <button type="button" role="tab" aria-selected="false" data-app-tab="shelf">Shelf</button>
+              <button type="button" role="tab" aria-selected="false" data-app-tab="about">About</button>
+            </div>
+            <figure class="app-showcase-frame">
+              <img data-app-tab-image src="assets/app-pages/general.png" alt="ShelfBar General settings screenshot">
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="story page-section" id="touchbar" aria-labelledby="touchbar-title">
+        <div class="section-inner story-layout">
+          <div class="story-copy" aria-live="polite">
+            <p class="eyebrow">Touch bar</p>
+            <h2 id="touchbar-title" data-story-title>Files stay close.</h2>
+            <div class="story-lines" data-story-lines>
+              <span>Drop files into ShelfBar.</span>
+              <span>Keep them parked on the Touch Bar.</span>
+              <span>Reopen them without breaking flow.</span>
+            </div>
+          </div>
+          <div class="story-product" data-product-stage data-variant="story" data-feature="files" data-story-stage>
+            <figure class="touchbar-shot stage-touchbar" data-touchbar-frame>
+              <video data-touchbar-video muted loop playsinline preload="metadata" aria-hidden="true"></video>
+              <img data-touchbar-image src="assets/touchbar/files.png?v=touchbar-20260906-006" alt="ShelfBar Files on a real Touch Bar">
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="qa page-section" id="qa" aria-labelledby="qa-title">
+        <div class="section-inner qa-inner">
+          <div class="section-heading reveal">
+            <p class="eyebrow">Questions</p>
+            <h2 id="qa-title">Q&amp;A</h2>
+            <p>Have a question? Open a row and keep the answer list compact until you need it.</p>
+          </div>
+
+          <div class="qa-list reveal">
+            <div class="qa-item">
+              <button class="qa-question" type="button" aria-expanded="false" aria-controls="qa-answer-1">What does ShelfBar put on the Touch Bar?<span class="qa-icon" aria-hidden="true"></span></button>
+              <div class="qa-answer" id="qa-answer-1" aria-hidden="true">
+                <div class="qa-answer-inner">
+                  <p>Files, clipboard clips, search, stacks, pinned items, recent work, and drop targets.</p>
+                </div>
+              </div>
+            </div>
+            <div class="qa-item">
+              <button class="qa-question" type="button" aria-expanded="false" aria-controls="qa-answer-2">Can I keep important files fixed?<span class="qa-icon" aria-hidden="true"></span></button>
+              <div class="qa-answer" id="qa-answer-2" aria-hidden="true">
+                <div class="qa-answer-inner">
+                  <p>Yes. Pin the files you use constantly, and ShelfBar keeps them separated from the changing shelf.</p>
+                </div>
+              </div>
+            </div>
+            <div class="qa-item">
+              <button class="qa-question" type="button" aria-expanded="false" aria-controls="qa-answer-3">Does search stay on the Touch Bar?<span class="qa-icon" aria-hidden="true"></span></button>
+              <div class="qa-answer" id="qa-answer-3" aria-hidden="true">
+                <div class="qa-answer-inner">
+                  <p>Yes. You can type, narrow the shelf, clear the query, and close search without opening another history window.</p>
+                </div>
+              </div>
+            </div>
+            <div class="qa-item">
+              <button class="qa-question" type="button" aria-expanded="false" aria-controls="qa-answer-4">Is this preview using real screenshots?<span class="qa-icon" aria-hidden="true"></span></button>
+              <div class="qa-answer" id="qa-answer-4" aria-hidden="true">
+                <div class="qa-answer-inner">
+                  <p>Yes. The app windows and Touch Bar strips shown here use captured ShelfBar interface assets.</p>
+                </div>
+              </div>
+            </div>
+            <div class="qa-item">
+              <button class="qa-question" type="button" aria-expanded="false" aria-controls="qa-answer-5">Is ShelfBar free?<span class="qa-icon" aria-hidden="true"></span></button>
+              <div class="qa-answer" id="qa-answer-5" aria-hidden="true">
+                <div class="qa-answer-inner">
+                  <p>Yes. ShelfBar is free to download from this page.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="release page-section" id="release-paused" aria-labelledby="release-title">
+        <div class="section-inner release-inner reveal">
+          <p class="eyebrow">Get ShelfBar</p>
+          <img class="release-logo" src="assets/shelfbar-brand-light.png" alt="ShelfBar logo" width="96" height="96">
+          <h2 id="release-title">Bring your Touch Bar back to work.</h2>
+          <p>Files, clips, search, stacks, and pinned work stay one touch away.</p>
+          <div class="button-row">
+            <a class="button button-primary" href="assets/downloads/ShelfBar.dmg?v=stabilityfix9-iconfix" download="ShelfBar.dmg">Download for macOS</a>
+            <a class="button button-secondary" href="https://github.com/chenyouxiang0810-gif/ShelfBar">GitHub</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>ShelfBar</span>
+      <span>Files. Clips. Search. Stack. Pin.</span>
+    </footer>
+
+    <script src="script.js?v=touchbar-20260906-006" defer></script>
+  </body>
+</html>

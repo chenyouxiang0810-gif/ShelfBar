@@ -2,39 +2,47 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let settings = AppSettingsStore()
     private let shelf = FileShelfModel()
     private let stacks = ShelfStackModel()
-    private lazy var privateTouchBarController = PrivateTouchBarController(shelf: shelf, stacks: stacks)
+    private lazy var clipboardStore = ClipboardStore(settings: settings)
+    private lazy var favoritesStore = FavoritesStore()
+    private lazy var recentItemsStore = RecentItemsStore(settings: settings)
+    private lazy var privateTouchBarController = PrivateTouchBarController(
+        shelf: shelf,
+        stacks: stacks,
+        settings: settings,
+        clipboardStore: clipboardStore,
+        favoritesStore: favoritesStore,
+        recentItemsStore: recentItemsStore
+    )
     private let mouseBridgeResearchController = MouseBridgeResearchController()
     private var debugWindowController: DebugWindowController?
     private var overlayController: ScreenEdgeDropOverlayController?
     private var finderDragMonitor: FinderDragMonitor?
     private var menuBarController: MenuBarController?
-    private var floatingShelfButtonController: FloatingShelfButtonController?
+    private var globalHotKeyController: GlobalHotKeyController?
+    private var appearanceObservation: NSKeyValueObservation?
+    private var lastAppearanceRefreshKey: String?
+    private var workspaceNotificationTokens: [NSObjectProtocol] = []
+    private var commandFMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        UserDefaults.standard.register(defaults: [
-            "ShelfBar.showFloatingAfterClose": true,
-            "ShelfBar.autoDissolveSingleItemStack": true,
-            "ShelfBar.enableAirDropZone": true,
-            "ShelfBar.floatingOpenAnimation": "instant"
-        ])
         let recoveredStackItems = stacks.normalize(
-            autoDissolveSingle: UserDefaults.standard.bool(
-                forKey: "ShelfBar.autoDissolveSingleItemStack"
-            )
+            autoDissolveSingle: settings.autoDissolveSingleItemStack
         )
         if !recoveredStackItems.isEmpty {
             shelf.add(existingItems: recoveredStackItems)
         }
-        let showInDock = UserDefaults.standard.bool(forKey: "ShelfBar.showInDock")
+        let showInDock = settings.showInDock
         NSApp.setActivationPolicy(showInDock ? .regular : .accessory)
-        if let icon = shelfBarBrandImage(for: NSApp.effectiveAppearance) {
-            NSApp.applicationIconImage = icon
-        }
+        ShelfBarIconTheme.updateApplicationIcon()
         let overlayController = ScreenEdgeDropOverlayController(
             delegate: privateTouchBarController
         )
+        overlayController.isAirDropEnabledProvider = { [weak settings] in
+            settings?.isFeatureEnabled(.airDrop) ?? true
+        }
         privateTouchBarController.setMouseBridgeHeightInPixels(
             overlayController.heightInPixels
         )
@@ -42,8 +50,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             touchBarController: privateTouchBarController,
             overlayController: overlayController,
             mouseBridgeResearchController: mouseBridgeResearchController,
-            stacks: stacks
+            stacks: stacks,
+            settings: settings,
+            clipboardStore: clipboardStore,
+            favoritesStore: favoritesStore,
+            recentItemsStore: recentItemsStore
         )
+        settings.onChange = { [weak self, weak privateTouchBarController, weak debugWindowController] change in
+            privateTouchBarController?.settingsDidChange(change)
+            debugWindowController?.settingsDidChange(change)
+            self?.menuBarController?.settingsDidChange(change)
+            self?.clipboardStore.settingsDidChange(change)
+            self?.recentItemsStore.settingsDidChange(change)
+            self?.globalHotKeyController?.settingsDidChange(change)
+        }
+        clipboardStore.bootstrapCurrentPasteboard(reason: "app-launch")
         let finderDragMonitor = FinderDragMonitor(overlayController: overlayController)
         finderDragMonitor.onFileDragDetected = { [weak privateTouchBarController] in
             privateTouchBarController?.finderFileDragDetected()
@@ -57,34 +78,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menuBarController = MenuBarController(
             shelfController: privateTouchBarController,
             overlayController: overlayController,
-            windowController: debugWindowController
+            windowController: debugWindowController,
+            settings: settings
         )
         self.menuBarController = menuBarController
-        let floatingShelfButtonController = FloatingShelfButtonController()
-        floatingShelfButtonController.onPresentShelf = { [weak privateTouchBarController] in
-            privateTouchBarController?.presentSystemModal()
+        let globalHotKeyController = GlobalHotKeyController(settings: settings)
+        globalHotKeyController.onOpenShelf = { [weak privateTouchBarController] in
+            privateTouchBarController?.presentSystemModalFromShortcut()
         }
-        floatingShelfButtonController.onShowApp = { [weak debugWindowController] in
-            debugWindowController?.openPreferences(page: 0)
-        }
-        privateTouchBarController.onUserClosedShelf = { [weak floatingShelfButtonController] in
-            guard UserDefaults.standard.bool(forKey: "ShelfBar.showFloatingAfterClose") else {
-                return
-            }
-            floatingShelfButtonController?.show()
-        }
-        privateTouchBarController.onShelfPresented = { [weak floatingShelfButtonController] in
-            floatingShelfButtonController?.hide()
-        }
-        debugWindowController.onFloatingButtonPreferenceChange = {
-            [weak floatingShelfButtonController] enabled in
-            if !enabled {
-                floatingShelfButtonController?.hide()
-            }
-        }
-        self.floatingShelfButtonController = floatingShelfButtonController
+        globalHotKeyController.start()
+        self.globalHotKeyController = globalHotKeyController
         debugWindowController.onDockPreferenceChange = { [weak self] enabled in
             self?.setDockVisibility(enabled)
+        }
+
+        commandFMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+            [weak privateTouchBarController] event in
+            if event.modifierFlags.contains(.command),
+               event.charactersIgnoringModifiers?.lowercased() == "f" {
+                privateTouchBarController?.beginSearch()
+                return nil
+            }
+            return event
         }
 
         mouseBridgeResearchController.fileURLProvider = { [weak shelf] in
@@ -104,13 +119,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if showInDock {
             debugWindowController.openPreferences(page: 0)
         }
+        configureAppearanceObservation()
+        configureSessionNotifications()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         mouseBridgeResearchController.onModeChange = nil
         mouseBridgeResearchController.setEnabled(false)
         finderDragMonitor?.stop()
-        floatingShelfButtonController?.hide()
+        if let commandFMonitor {
+            NSEvent.removeMonitor(commandFMonitor)
+            self.commandFMonitor = nil
+        }
+        appearanceObservation?.invalidate()
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        workspaceNotificationTokens.forEach { workspaceCenter.removeObserver($0) }
+        workspaceNotificationTokens.removeAll()
         privateTouchBarController.dismissSystemModal()
     }
 
@@ -123,5 +147,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if visible {
             debugWindowController?.openPreferences(page: 0)
         }
+    }
+
+    private func configureAppearanceObservation() {
+        appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.initial, .new]) {
+            [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.refreshResolvedAppearance(reason: "effectiveAppearance")
+            }
+        }
+    }
+
+    private func refreshResolvedAppearance(reason: String) {
+        let dark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let themeMode = UserDefaults.standard.string(forKey: ShelfBarSettingsKey.theme) ?? "auto"
+        let key = "\(themeMode):\(ShelfBarIconTheme.current.rawValue):\(dark ? "dark" : "light")"
+        guard lastAppearanceRefreshKey != key else { return }
+        lastAppearanceRefreshKey = key
+        print("[ShelfBar] appearance refresh reason=\(reason) key=\(key)")
+        ShelfBarIconTheme.updateApplicationIcon()
+        menuBarController?.appearanceDidChange()
+        debugWindowController?.appearanceDidChange()
+        privateTouchBarController.appearanceDidChange()
+    }
+
+    private func configureSessionNotifications() {
+        let center = NSWorkspace.shared.notificationCenter
+        let resign = center.addObserver(
+            forName: NSWorkspace.sessionDidResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor [weak self] in
+                self?.privateTouchBarController.setSessionActive(
+                    false,
+                    reason: notification.name.rawValue
+                )
+            }
+        }
+        let become = center.addObserver(
+            forName: NSWorkspace.sessionDidBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor [weak self] in
+                self?.privateTouchBarController.setSessionActive(
+                    true,
+                    reason: notification.name.rawValue
+                )
+            }
+        }
+        workspaceNotificationTokens = [resign, become]
     }
 }

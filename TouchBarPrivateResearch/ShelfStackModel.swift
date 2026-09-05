@@ -89,11 +89,13 @@ enum ShelfStackRemovalOutcome {
 final class ShelfStackModel {
     private static let storageKey = "ShelfBar.folderStacks.v1"
 
+    private let defaults: UserDefaults
     private(set) var stacks: [ShelfStack]
     var onChange: (([ShelfStack]) -> Void)?
 
-    init() {
-        guard let data = UserDefaults.standard.data(forKey: Self.storageKey),
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        guard let data = defaults.data(forKey: Self.storageKey),
               let decoded = try? JSONDecoder().decode([ShelfStack].self, from: data)
         else {
             stacks = []
@@ -145,6 +147,18 @@ final class ShelfStackModel {
         guard let index = stacks.firstIndex(where: { $0.id == id }) else { return }
         stacks.remove(at: index)
         commit()
+    }
+
+    @discardableResult
+    func dissolveToRoot(id: UUID) -> [FileShelfItem] {
+        guard let index = stacks.firstIndex(where: { $0.id == id }) else { return [] }
+        let stack = stacks.remove(at: index)
+        let recoveredItems = stack.entries.compactMap(\.fileItem)
+        for stackIndex in stacks.indices where stacks[stackIndex].parentStackID == id {
+            stacks[stackIndex].parentStackID = nil
+        }
+        commit()
+        return recoveredItems
     }
 
     func clear() {
@@ -207,6 +221,30 @@ final class ShelfStackModel {
         stacks.filter { $0.parentStackID == parentID }
     }
 
+    func searchScopeStacks(currentStackID: UUID?) -> [ShelfStack] {
+        guard let currentStackID else { return stacks }
+
+        var scopedIDs: Set<UUID> = [currentStackID]
+        var ordered: [ShelfStack] = []
+        var queue: [UUID] = [currentStackID]
+        var cursor = 0
+
+        while cursor < queue.count {
+            let parentID = queue[cursor]
+            cursor += 1
+
+            if let stack = stack(id: parentID) {
+                ordered.append(stack)
+            }
+
+            for child in childStacks(of: parentID) where scopedIDs.insert(child.id).inserted {
+                queue.append(child.id)
+            }
+        }
+
+        return ordered
+    }
+
     func directItemCount(in stackID: UUID) -> Int {
         (stack(id: stackID)?.entries.count ?? 0) + childStacks(of: stackID).count
     }
@@ -237,6 +275,27 @@ final class ShelfStackModel {
     func moveStack(id: UUID, toParent parentID: UUID?) {
         guard let index = stacks.firstIndex(where: { $0.id == id }), id != parentID else { return }
         stacks[index].parentStackID = parentID
+        commit()
+    }
+
+    func moveStack(id: UUID, withinParent parentID: UUID?, to destinationIndex: Int) {
+        let siblingIndexes = stacks.indices.filter { stacks[$0].parentStackID == parentID }
+        guard let sourceSiblingIndex = siblingIndexes.firstIndex(where: { stacks[$0].id == id }) else { return }
+        let sourceStorageIndex = siblingIndexes[sourceSiblingIndex]
+        let stack = stacks.remove(at: sourceStorageIndex)
+
+        let remainingSiblingIndexes = stacks.indices.filter { stacks[$0].parentStackID == parentID }
+        var adjusted = destinationIndex
+        if sourceSiblingIndex < adjusted { adjusted -= 1 }
+        adjusted = min(max(adjusted, 0), remainingSiblingIndexes.count)
+
+        let insertionStorageIndex: Int
+        if adjusted >= remainingSiblingIndexes.count {
+            insertionStorageIndex = (remainingSiblingIndexes.last.map { $0 + 1 }) ?? stacks.count
+        } else {
+            insertionStorageIndex = remainingSiblingIndexes[adjusted]
+        }
+        stacks.insert(stack, at: min(max(insertionStorageIndex, 0), stacks.count))
         commit()
     }
 
@@ -276,7 +335,7 @@ final class ShelfStackModel {
 
     private func commit() {
         if let data = try? JSONEncoder().encode(stacks) {
-            UserDefaults.standard.set(data, forKey: Self.storageKey)
+            defaults.set(data, forKey: Self.storageKey)
         }
         onChange?(stacks)
     }

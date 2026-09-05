@@ -15,6 +15,7 @@ final class ScreenEdgeDropOverlayController: NSWindowController {
     private final class OverlayDropView: NSView {
         private weak var dropDelegate: OverlayDropDelegate?
         var onDragFinished: (() -> Void)?
+        var isAirDropEnabledProvider: (() -> Bool)?
         private var activeZone: ShelfDropZone = .none
 
         init(delegate: OverlayDropDelegate) {
@@ -94,33 +95,42 @@ final class ScreenEdgeDropOverlayController: NSWindowController {
 
         private func zoneSnapshot(for location: NSPoint) -> ShelfDropZoneSnapshot {
             let gap: CGFloat = 8
-            let split = bounds.width / 3
-            let airDropMaxX = split - gap / 2
-            let shelfMinX = split + gap / 2
-            let airDropRect = NSRect(
-                x: bounds.minX,
-                y: bounds.minY,
-                width: max(airDropMaxX - bounds.minX, 0),
-                height: bounds.height
-            )
-            let gapRect = NSRect(
-                x: airDropMaxX,
-                y: bounds.minY,
-                width: max(shelfMinX - airDropMaxX, 0),
-                height: bounds.height
-            )
-            let shelfRect = NSRect(
-                x: shelfMinX,
-                y: bounds.minY,
-                width: max(bounds.maxX - shelfMinX, 0),
-                height: bounds.height
-            )
+            let airDropEnabled = isAirDropEnabledProvider?() ?? true
+            let airDropRect: NSRect
+            let gapRect: NSRect
+            let shelfRect: NSRect
+            if airDropEnabled {
+                let split = bounds.width / 3
+                let airDropMaxX = split - gap / 2
+                let shelfMinX = split + gap / 2
+                airDropRect = NSRect(
+                    x: bounds.minX,
+                    y: bounds.minY,
+                    width: max(airDropMaxX - bounds.minX, 0),
+                    height: bounds.height
+                )
+                gapRect = NSRect(
+                    x: airDropMaxX,
+                    y: bounds.minY,
+                    width: max(shelfMinX - airDropMaxX, 0),
+                    height: bounds.height
+                )
+                shelfRect = NSRect(
+                    x: shelfMinX,
+                    y: bounds.minY,
+                    width: max(bounds.maxX - shelfMinX, 0),
+                    height: bounds.height
+                )
+            } else {
+                airDropRect = .zero
+                gapRect = .zero
+                shelfRect = bounds
+            }
             let zone: ShelfDropZone
             if !bounds.contains(location) {
                 zone = .none
-            } else if UserDefaults.standard.object(forKey: "ShelfBar.enableAirDropZone") != nil,
-                      !UserDefaults.standard.bool(forKey: "ShelfBar.enableAirDropZone") {
-                zone = .shelf
+            } else if !airDropEnabled {
+                zone = shelfRect.contains(location) ? .shelf : .none
             } else if airDropRect.contains(location) {
                 zone = .airDrop
             } else if shelfRect.contains(location) {
@@ -147,8 +157,14 @@ final class ScreenEdgeDropOverlayController: NSWindowController {
     private(set) var isOverlayVisible = false
     private(set) var isEnabled: Bool
     private(set) var heightInPixels: Int
+    var isAirDropEnabledProvider: (() -> Bool)? {
+        didSet {
+            dropView.isAirDropEnabledProvider = isAirDropEnabledProvider
+        }
+    }
     var onConfigurationChange: (() -> Void)?
 
+    private let dropView: OverlayDropView
     private var pendingHide: DispatchWorkItem?
 
     init(delegate: OverlayDropDelegate) {
@@ -162,6 +178,7 @@ final class ScreenEdgeDropOverlayController: NSWindowController {
         heightInPixels = Self.supportedHeights.contains(storedHeight) ? storedHeight : 5
 
         let dropView = OverlayDropView(delegate: delegate)
+        self.dropView = dropView
         let panel = OverlayPanel(
             contentRect: .zero,
             styleMask: [.borderless, .nonactivatingPanel],

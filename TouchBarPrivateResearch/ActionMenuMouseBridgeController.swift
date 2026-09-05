@@ -1,6 +1,69 @@
 import AppKit
 
 @MainActor
+enum TouchBarHorizontalScrollBridge {
+    @discardableResult
+    static func scrollFirstStrip(
+        in parent: NSView,
+        deltaX: CGFloat,
+        deltaY: CGFloat,
+        inverted: Bool,
+        logPrefix: String,
+        logHandler: (String) -> Void
+    ) -> CGFloat? {
+        guard let scrollView = descendantScrollView(of: parent),
+              let documentView = scrollView.documentView
+        else {
+            logHandler("\(logPrefix) scroll unavailable")
+            return nil
+        }
+        return scroll(
+            scrollView,
+            documentView: documentView,
+            deltaX: deltaX,
+            deltaY: deltaY,
+            inverted: inverted,
+            logPrefix: logPrefix,
+            logHandler: logHandler
+        )
+    }
+
+    @discardableResult
+    static func scroll(
+        _ scrollView: NSScrollView,
+        documentView: NSView,
+        deltaX: CGFloat,
+        deltaY: CGFloat,
+        inverted: Bool,
+        logPrefix: String,
+        logHandler: (String) -> Void
+    ) -> CGFloat {
+        let rawDelta = abs(deltaX) > 0.01 ? deltaX : deltaY
+        let contentDelta = inverted ? -rawDelta : rawDelta
+        let maximum = max(documentView.bounds.width - scrollView.contentView.bounds.width, 0)
+        var origin = scrollView.contentView.bounds.origin
+        origin.x = min(max(origin.x + contentDelta, 0), maximum)
+        scrollView.contentView.scroll(to: origin)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        logHandler(
+            "\(logPrefix) scroll offset=\(String(format: "%.2f", origin.x)) "
+                + "delta=\(String(format: "%.2f", contentDelta)) "
+                + "viewport=\(String(format: "%.1f", scrollView.contentView.bounds.width)) "
+                + "document=\(String(format: "%.1f", documentView.bounds.width))"
+        )
+        return origin.x
+    }
+
+    static func descendantScrollView(of view: NSView) -> NSScrollView? {
+        if let scrollView = view as? NSScrollView { return scrollView }
+        for subview in view.subviews {
+            if let result = descendantScrollView(of: subview) { return result }
+        }
+        return nil
+    }
+}
+
+@MainActor
 final class ActionMenuMouseBridgeController: NSObject {
     fileprivate struct HitRegion {
         let id: String
@@ -17,6 +80,13 @@ final class ActionMenuMouseBridgeController: NSObject {
         weak var bridge: ActionMenuMouseBridgeController?
         private var trackingAreaReference: NSTrackingArea?
         private weak var pressedButton: NSButton?
+        private var mouseDownPoint: NSPoint?
+        private var lastScrollDragPoint: NSPoint?
+        private var didScrollDrag = false
+
+        var hasActiveGesture: Bool {
+            pressedButton != nil || mouseDownPoint != nil || didScrollDrag
+        }
 
         override func updateTrackingAreas() {
             super.updateTrackingAreas()
@@ -48,24 +118,75 @@ final class ActionMenuMouseBridgeController: NSObject {
             bridge?.pointerExited()
         }
 
+        override func scrollWheel(with event: NSEvent) {
+            let horizontal = event.scrollingDeltaX
+            let shiftedVertical = event.modifierFlags.contains(.shift)
+                ? event.scrollingDeltaY
+                : 0
+            guard abs(horizontal) > 0.01 || abs(shiftedVertical) > 0.01 else { return }
+            bridge?.scrollActionStrip(
+                deltaX: horizontal,
+                deltaY: shiftedVertical,
+                inverted: event.isDirectionInvertedFromDevice
+            )
+        }
+
         override func mouseDown(with event: NSEvent) {
+            mouseDownPoint = event.locationInWindow
+            lastScrollDragPoint = nil
+            didScrollDrag = false
             pressedButton = bridge?.hit(atPanelPoint: event.locationInWindow)?.button
         }
 
+        override func mouseDragged(with event: NSEvent) {
+            guard let start = mouseDownPoint else { return }
+            let previous = lastScrollDragPoint ?? start
+            let totalDistance = hypot(
+                event.locationInWindow.x - start.x,
+                event.locationInWindow.y - start.y
+            )
+            guard totalDistance >= 5 else { return }
+            didScrollDrag = true
+            lastScrollDragPoint = event.locationInWindow
+            bridge?.scrollActionStrip(
+                deltaX: -(event.locationInWindow.x - previous.x),
+                deltaY: -(event.locationInWindow.y - previous.y),
+                inverted: false
+            )
+        }
+
         override func mouseUp(with event: NSEvent) {
-            defer { pressedButton = nil }
-            guard let pressedButton,
-                  bridge?.hit(atPanelPoint: event.locationInWindow)?.button === pressedButton
-            else { return }
-            bridge?.click(pressedButton)
+            defer {
+                pressedButton = nil
+                mouseDownPoint = nil
+                lastScrollDragPoint = nil
+                didScrollDrag = false
+            }
+            guard !didScrollDrag else { return }
+            if let pressedButton,
+               pressedButton.window != nil,
+               !pressedButton.isHidden,
+               pressedButton.alphaValue > 0.01,
+               pressedButton.isEnabled {
+                bridge?.click(pressedButton)
+                return
+            }
+            if let released = bridge?.hit(atPanelPoint: event.locationInWindow)?.button {
+                bridge?.click(released)
+            }
+        }
+
+        func resetInteractionState() {
+            pressedButton = nil
+            mouseDownPoint = nil
+            lastScrollDragPoint = nil
+            didScrollDrag = false
         }
     }
 
     private static let virtualTouchBarHeight: CGFloat = 40
     private static let enterThreshold: CGFloat = 5
     private static let exitThreshold: CGFloat = 12
-    private static let actionTitles = Set(["OPEN", "REMOVE", "BACK", "DELETE"])
-
     private let logHandler: (String) -> Void
     private weak var physicalTouchBarView: NSView?
     private weak var cursorView: NSImageView?
@@ -92,7 +213,12 @@ final class ActionMenuMouseBridgeController: NSObject {
 
     func present() {
         if panel != nil {
-            scheduleHitRegionRebuild()
+            panel?.orderFrontRegardless()
+            updatePanelFrame()
+            scheduleHitRegionRebuild(delay: 0.0, allowCoexisting: true)
+            scheduleHitRegionRebuild(delay: 0.03)
+            scheduleHitRegionRebuild(delay: 0.14, allowCoexisting: true)
+            scheduleHitRegionRebuild(delay: 0.30, allowCoexisting: true)
             return
         }
         attachWorkItem?.cancel()
@@ -100,7 +226,16 @@ final class ActionMenuMouseBridgeController: NSObject {
             self?.attachToActionMenu()
         }
         attachWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.10, execute: work)
+        let retry = DispatchWorkItem { [weak self] in
+            guard self?.panel == nil else {
+                self?.scheduleHitRegionRebuild(delay: 0.03)
+                self?.scheduleHitRegionRebuild(delay: 0.18, allowCoexisting: true)
+                return
+            }
+            self?.attachToActionMenu()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28, execute: retry)
     }
 
     func dismiss() {
@@ -108,12 +243,33 @@ final class ActionMenuMouseBridgeController: NSObject {
         attachWorkItem = nil
         rebuildWorkItem?.cancel()
         rebuildWorkItem = nil
+        bridgeView?.resetInteractionState()
         hitRegions.removeAll()
         panel?.orderOut(nil)
         panel = nil
         bridgeView = nil
         pointerExited()
         physicalTouchBarView = nil
+    }
+
+    func resetTransientInteractionState(reason: String) {
+        bridgeView?.resetInteractionState()
+        pointerExited()
+        logHandler("Action menu transient reset | reason=\(reason)")
+    }
+
+    func debugStateSummary(parentView: NSView? = nil) -> String {
+        let root = parentView ?? physicalTouchBarView
+        let bridgeTrackingCount = bridgeView?.trackingAreas.count ?? 0
+        let touchBarTrackingCount = root.map { recursiveTrackingAreaCount(in: $0) } ?? 0
+        return "ActionBridge panel=\(panel != nil ? 1 : 0) bridgeView=\(bridgeView != nil ? 1 : 0) "
+            + "bridgeTrackingAreas=\(bridgeTrackingCount) touchBarTrackingAreas=\(touchBarTrackingCount) "
+            + "hitRegions=\(hitRegions.count) pointerInside=\(isPointerInsideBridge) "
+            + "activeGesture=\(bridgeView?.hasActiveGesture == true)"
+    }
+
+    func isGestureNeutralForDebug() -> Bool {
+        bridgeView?.hasActiveGesture != true
     }
 
     func setHeightInPixels(_ pixels: Int) {
@@ -164,12 +320,38 @@ final class ActionMenuMouseBridgeController: NSObject {
               virtualTouchBarRect.contains(panelPoint)
         else { return nil }
         let point = touchBarPoint(from: panelPoint, in: parent)
-        return hitRegions.first { $0.frame.contains(point) }
+        if let liveButton = liveButton(at: point, in: parent) {
+            let frame = liveButton.superview?.convert(liveButton.frame, to: parent) ?? .zero
+            return HitRegion(id: liveButton.title.uppercased(), frame: frame, button: liveButton)
+        }
+        return hitRegions.first { region in
+            guard region.button.window != nil,
+                  !region.button.isHidden,
+                  region.button.isEnabled
+            else { return false }
+            let currentFrame = region.button.superview?.convert(region.button.frame, to: parent)
+                ?? region.frame
+            return currentFrame.contains(point)
+        }
     }
 
     fileprivate func click(_ button: NSButton) {
         logHandler("Action menu click=\(button.title)")
         button.performClick(nil)
+    }
+
+    fileprivate func scrollActionStrip(deltaX: CGFloat, deltaY: CGFloat, inverted: Bool) {
+        guard let parent = physicalTouchBarView else { return }
+        _ = TouchBarHorizontalScrollBridge.scrollFirstStrip(
+            in: parent,
+            deltaX: deltaX,
+            deltaY: deltaY,
+            inverted: inverted,
+            logPrefix: "Action menu",
+            logHandler: logHandler
+        )
+        scheduleHitRegionRebuild(delay: 0.03)
+        scheduleHitRegionRebuild(delay: 0.16, allowCoexisting: true)
     }
 
     private func attachToActionMenu() {
@@ -179,7 +361,12 @@ final class ActionMenuMouseBridgeController: NSObject {
             logHandler("Action menu MouseBridge unavailable: no physical Touch Bar view")
             return
         }
-        physicalTouchBarView = parent
+        if physicalTouchBarView !== parent {
+            pointerExited()
+            physicalTouchBarView = parent
+            logHandler("Action menu MouseBridge rebound to current Touch Bar view")
+        }
+        parent.layoutSubtreeIfNeeded()
         bridgeWidth = parent.visibleRect.width
         createPanel()
         scheduleHitRegionRebuild()
@@ -209,22 +396,27 @@ final class ActionMenuMouseBridgeController: NSObject {
         panel.orderFrontRegardless()
     }
 
-    private func scheduleHitRegionRebuild() {
-        rebuildWorkItem?.cancel()
+    private func scheduleHitRegionRebuild(delay: TimeInterval = 0.08, allowCoexisting: Bool = false) {
+        if !allowCoexisting {
+            rebuildWorkItem?.cancel()
+        }
         let work = DispatchWorkItem { [weak self] in
             self?.rebuildHitRegions()
         }
-        rebuildWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
+        if !allowCoexisting {
+            rebuildWorkItem = work
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     private func rebuildHitRegions() {
         rebuildWorkItem = nil
         guard let parent = physicalTouchBarView else { return }
         hitRegions = descendantButtons(of: parent).compactMap { button in
-            guard Self.actionTitles.contains(button.title.uppercased()),
-                  !button.isHidden,
+            guard !button.isHidden,
                   button.alphaValue > 0.01,
+                  button.isEnabled,
+                  button.action != nil,
                   let superview = button.superview
             else { return nil }
             let frame = superview.convert(button.frame, to: parent)
@@ -242,6 +434,21 @@ final class ActionMenuMouseBridgeController: NSObject {
         } else if isPointerInsideBridge, let point = currentPanelPoint {
             pointerMoved(toPanelPoint: point)
         }
+    }
+
+    private func liveButton(at point: NSPoint, in parent: NSView) -> NSButton? {
+        var candidate = parent.hitTest(point)
+        while let view = candidate, view !== parent {
+            if let button = view as? NSButton,
+               button.isEnabled,
+               !button.isHidden,
+               button.alphaValue > 0.01,
+               button.action != nil {
+                return button
+            }
+            candidate = view.superview
+        }
+        return nil
     }
 
     private func descendantButtons(of view: NSView) -> [NSButton] {
@@ -312,5 +519,11 @@ final class ActionMenuMouseBridgeController: NSObject {
                 max(parent.bounds.height - cursor.frame.height, 0)
             )
         )
+    }
+
+    private func recursiveTrackingAreaCount(in view: NSView) -> Int {
+        view.trackingAreas.count + view.subviews.reduce(0) { partial, subview in
+            partial + recursiveTrackingAreaCount(in: subview)
+        }
     }
 }

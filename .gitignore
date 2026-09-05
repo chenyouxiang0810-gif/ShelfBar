@@ -11,3 +11,4 @@ build/**/*.tmp.dmg
 *.dmg
 *.xcarchive
 *.log
+web/shelfbar-v2-preview/dist/

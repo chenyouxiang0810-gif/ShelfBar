@@ -78,7 +78,7 @@ final class TouchBarDropButton: NSView {
         }
     }
 
-    private let airDropZone: ZoneView
+    private let airDropZone: ZoneView?
     private let shelfZone: ZoneView
 
     static func drawerImage() -> NSImage? {
@@ -98,12 +98,14 @@ final class TouchBarDropButton: NSView {
         )
     }
 
-    init(activeZone: ShelfDropZone = .none) {
-        airDropZone = ZoneView(
-            title: "AirDrop",
-            image: Self.airDropImage(),
-            iconScale: 1.08
-        )
+    init(activeZone: ShelfDropZone = .none, isAirDropEnabled: Bool = true) {
+        airDropZone = isAirDropEnabled
+            ? ZoneView(
+                title: "AirDrop",
+                image: Self.airDropImage(),
+                iconScale: 1.08
+            )
+            : nil
         shelfZone = ZoneView(
             title: "Drop your file here",
             image: Self.drawerImage(),
@@ -111,20 +113,33 @@ final class TouchBarDropButton: NSView {
         )
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
-        addSubview(airDropZone)
+        if let airDropZone {
+            addSubview(airDropZone)
+        }
         addSubview(shelfZone)
-        NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: 520),
-            heightAnchor.constraint(equalToConstant: 30),
-            airDropZone.leadingAnchor.constraint(equalTo: leadingAnchor),
-            airDropZone.topAnchor.constraint(equalTo: topAnchor),
-            airDropZone.bottomAnchor.constraint(equalTo: bottomAnchor),
-            airDropZone.widthAnchor.constraint(equalTo: widthAnchor, multiplier: 1 / 3, constant: -4),
-            shelfZone.leadingAnchor.constraint(equalTo: airDropZone.trailingAnchor, constant: 8),
-            shelfZone.trailingAnchor.constraint(equalTo: trailingAnchor),
-            shelfZone.topAnchor.constraint(equalTo: topAnchor),
-            shelfZone.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
+        if let airDropZone {
+            NSLayoutConstraint.activate([
+                widthAnchor.constraint(equalToConstant: 520),
+                heightAnchor.constraint(equalToConstant: 30),
+                airDropZone.leadingAnchor.constraint(equalTo: leadingAnchor),
+                airDropZone.topAnchor.constraint(equalTo: topAnchor),
+                airDropZone.bottomAnchor.constraint(equalTo: bottomAnchor),
+                airDropZone.widthAnchor.constraint(equalTo: widthAnchor, multiplier: 1 / 3, constant: -4),
+                shelfZone.leadingAnchor.constraint(equalTo: airDropZone.trailingAnchor, constant: 8),
+                shelfZone.trailingAnchor.constraint(equalTo: trailingAnchor),
+                shelfZone.topAnchor.constraint(equalTo: topAnchor),
+                shelfZone.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
+        } else {
+            NSLayoutConstraint.activate([
+                widthAnchor.constraint(equalToConstant: 360),
+                heightAnchor.constraint(equalToConstant: 30),
+                shelfZone.leadingAnchor.constraint(equalTo: leadingAnchor),
+                shelfZone.trailingAnchor.constraint(equalTo: trailingAnchor),
+                shelfZone.topAnchor.constraint(equalTo: topAnchor),
+                shelfZone.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
+        }
         applyActiveZone(activeZone, animated: false)
     }
 
@@ -133,7 +148,7 @@ final class TouchBarDropButton: NSView {
     }
 
     func applyActiveZone(_ zone: ShelfDropZone, animated: Bool = true) {
-        airDropZone.apply(active: zone == .airDrop, animated: animated)
+        airDropZone?.apply(active: zone == .airDrop, animated: animated)
         shelfZone.apply(active: zone == .shelf, animated: animated)
     }
 }

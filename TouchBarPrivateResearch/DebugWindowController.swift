@@ -1,17 +1,22 @@
 import AppKit
+import Carbon
 import UniformTypeIdentifiers
 
 @MainActor
 func shelfBarBrandImage(for appearance: NSAppearance) -> NSImage? {
-    let match = appearance.bestMatch(from: [.darkAqua, .aqua])
-    let resource = match == .darkAqua ? "ShelfBarDark" : "ShelfBarLight"
-    return Bundle.main.image(forResource: resource)
+    ShelfBarIconTheme.image(for: appearance)
 }
 
 @MainActor
 private final class ShelfBarLogoImageView: NSImageView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(iconThemeDidChange),
+            name: ShelfBarIconTheme.didChangeNotification,
+            object: nil
+        )
         refreshBrandImage()
     }
 
@@ -22,10 +27,16 @@ private final class ShelfBarLogoImageView: NSImageView {
 
     func refreshBrandImage() {
         image = shelfBarBrandImage(for: effectiveAppearance)
-        if let image {
-            NSApp.applicationIconImage = image
-        }
     }
+
+    @objc private func iconThemeDidChange() {
+        refreshBrandImage()
+    }
+}
+
+@MainActor
+private final class TopAlignedDocumentView: NSView {
+    override var isFlipped: Bool { true }
 }
 
 @MainActor
@@ -198,6 +209,102 @@ private final class ShelfBarSidebarButton: NSButton {
 }
 
 @MainActor
+private final class ShelfBarIconThemeButton: NSButton {
+    let iconTheme: ShelfBarIconTheme
+    private let previewImageView = NSImageView()
+    private let titleLabel: NSTextField
+
+    var isSelectedTheme = false {
+        didSet { updateSelectionAppearance() }
+    }
+
+    init(theme: ShelfBarIconTheme, target: AnyObject?, action: Selector?) {
+        iconTheme = theme
+        titleLabel = NSTextField(labelWithString: theme.displayName)
+        super.init(frame: .zero)
+        title = ""
+        self.target = target
+        self.action = action
+        isBordered = false
+        bezelStyle = .regularSquare
+        font = .systemFont(ofSize: 11, weight: .semibold)
+        alignment = .center
+        focusRingType = .none
+        wantsLayer = true
+        translatesAutoresizingMaskIntoConstraints = false
+        layer?.cornerRadius = 14
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 1
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowRadius = 8
+        layer?.shadowOffset = NSSize(width: 0, height: -2)
+
+        previewImageView.image = Self.previewImage(for: theme)
+        previewImageView.imageScaling = .scaleProportionallyUpOrDown
+        previewImageView.translatesAutoresizingMaskIntoConstraints = false
+        previewImageView.wantsLayer = true
+        previewImageView.layer?.cornerRadius = 10
+        previewImageView.layer?.cornerCurve = .continuous
+        titleLabel.font = .systemFont(ofSize: 11, weight: .semibold)
+        titleLabel.alignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let content = NSStackView(views: [previewImageView, titleLabel])
+        content.orientation = .vertical
+        content.alignment = .centerX
+        content.spacing = 8
+        content.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(content)
+        updateSelectionAppearance()
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: 118),
+            heightAnchor.constraint(equalToConstant: 132),
+            previewImageView.widthAnchor.constraint(equalToConstant: 72),
+            previewImageView.heightAnchor.constraint(equalToConstant: 72),
+            titleLabel.widthAnchor.constraint(equalToConstant: 96),
+            content.centerXAnchor.constraint(equalTo: centerXAnchor),
+            content.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 3)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshForAppearance()
+    }
+
+    func refreshForAppearance() {
+        previewImageView.image = Self.previewImage(for: iconTheme)
+        updateSelectionAppearance()
+    }
+
+    private static func previewImage(for theme: ShelfBarIconTheme) -> NSImage? {
+        theme.splitPreviewImage()
+    }
+
+    private func updateSelectionAppearance() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            if isSelectedTheme {
+                layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
+                layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.86).cgColor
+                layer?.shadowOpacity = 0.12
+                contentTintColor = .controlAccentColor
+                titleLabel.textColor = .controlAccentColor
+            } else {
+                layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.62).cgColor
+                layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.55).cgColor
+                layer?.shadowOpacity = 0.04
+                contentTintColor = .labelColor
+                titleLabel.textColor = .labelColor
+            }
+        }
+    }
+}
+
+@MainActor
 final class DebugWindowController: NSWindowController,
     NSTableViewDataSource,
     NSTableViewDelegate,
@@ -206,15 +313,17 @@ final class DebugWindowController: NSWindowController,
     private enum SidebarPage: Int, CaseIterable {
         case general
         case appearance
+        case features
         case shelf
-        case developer
+        case about
 
         var title: String {
             switch self {
             case .general: "General"
             case .appearance: "Appearance"
+            case .features: "Features"
             case .shelf: "Shelf"
-            case .developer: "Developer"
+            case .about: "About"
             }
         }
 
@@ -222,8 +331,9 @@ final class DebugWindowController: NSWindowController,
             switch self {
             case .general: "gearshape"
             case .appearance: "circle.lefthalf.filled"
+            case .features: "switch.2"
             case .shelf: "rectangle.bottomthird.inset.filled"
-            case .developer: "hammer"
+            case .about: "info.circle"
             }
         }
     }
@@ -247,10 +357,17 @@ final class DebugWindowController: NSWindowController,
     private let overlayController: ScreenEdgeDropOverlayController
     private let mouseBridgeResearchController: MouseBridgeResearchController
     private let stacks: ShelfStackModel
+    private let settings: AppSettingsStore
+    private let clipboardStore: ClipboardStore
+    private let favoritesStore: FavoritesStore
+    private let recentItemsStore: RecentItemsStore
 
     private let rootEffect = NSVisualEffectView()
     private let logoImageView = ShelfBarLogoImageView()
-    private let sidebarSettingsStack = NSStackView()
+    private let mainContentStack = NSStackView()
+    private weak var mainContentScrollView: NSScrollView?
+    private lazy var shelfPreviewCard = makePreviewCard()
+    private lazy var shelfFilesCard = makeFilesCard()
     private let previewStack = NSStackView()
     private weak var previewScrollView: NSScrollView?
     private let previewCountLabel = NSTextField(labelWithString: "0 items")
@@ -263,10 +380,16 @@ final class DebugWindowController: NSWindowController,
     private let tableView = NSTableView()
     private let overlayToggle = NSButton()
     private let showDockToggle = NSButton()
-    private let floatingButtonToggle = NSButton()
     private let airDropZoneToggle = NSButton()
-    private let floatingAnimationPopup = NSPopUpButton()
     private let autoDissolveToggle = NSButton()
+    private let clipboardShelfToggle = NSButton()
+    private let clipboardCaptureTextToggle = NSButton()
+    private let clipboardCaptureURLToggle = NSButton()
+    private let clipboardCaptureImageToggle = NSButton()
+    private let clipboardCaptureFileToggle = NSButton()
+    private let clipboardHistoryPopup = NSPopUpButton()
+    private let dropCounterSizeToggle = NSButton()
+    private let recentLimitPopup = NSPopUpButton()
     private let showDeveloperTabToggle = NSButton()
     private let overlayHeightPopup = NSPopUpButton()
     private let themeControl = NSSegmentedControl(labels: ["Auto", "Light", "Dark"], trackingMode: .selectOne, target: nil, action: nil)
@@ -276,25 +399,40 @@ final class DebugWindowController: NSWindowController,
     private let researchStatusLabel = NSTextField(labelWithString: "Research tools are off")
     private let dragLogTextView = NSTextView()
     private let developerDetailStack = NSStackView()
+    private let shortcutValueLabel = NSTextField(labelWithString: "")
+    private let recordShortcutButton = NSButton()
+    private let restoreShortcutButton = NSButton()
+    private let clearShortcutButton = NSButton()
+    private var shortcutRecorderMonitor: Any?
     private var sidebarButtons: [ShelfBarSidebarButton] = []
+    private var featureToggles: [ShelfBarFeature: NSButton] = [:]
+    private var iconThemeButtons: [ShelfBarIconTheme: ShelfBarIconThemeButton] = [:]
     private var selectedPage = SidebarPage.general
     private var items: [FileShelfItem] = []
     private var viewingStackID: UUID?
     private var stackButtonMap: [Int: UUID] = [:]
     private var metadataCache: [URL: FileMetadata] = [:]
+    private var shelfPageConstraintsInstalled = false
     var onDockPreferenceChange: ((Bool) -> Void)?
-    var onFloatingButtonPreferenceChange: ((Bool) -> Void)?
 
     init(
         touchBarController: PrivateTouchBarController,
         overlayController: ScreenEdgeDropOverlayController,
         mouseBridgeResearchController: MouseBridgeResearchController,
-        stacks: ShelfStackModel
+        stacks: ShelfStackModel,
+        settings: AppSettingsStore,
+        clipboardStore: ClipboardStore,
+        favoritesStore: FavoritesStore,
+        recentItemsStore: RecentItemsStore
     ) {
         self.touchBarController = touchBarController
         self.overlayController = overlayController
         self.mouseBridgeResearchController = mouseBridgeResearchController
         self.stacks = stacks
+        self.settings = settings
+        self.clipboardStore = clipboardStore
+        self.favoritesStore = favoritesStore
+        self.recentItemsStore = recentItemsStore
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1120, height: 780),
@@ -437,29 +575,15 @@ final class DebugWindowController: NSWindowController,
                 action: #selector(selectSidebarPage(_:))
             )
             button.tag = page.rawValue
-            if page == .developer {
-                button.isHidden = !UserDefaults.standard.bool(forKey: "ShelfBar.showDeveloperTab")
-            }
             button.widthAnchor.constraint(equalToConstant: 214).isActive = true
             navigation.addArrangedSubview(button)
             sidebarButtons.append(button)
         }
 
-        sidebarSettingsStack.orientation = .vertical
-        sidebarSettingsStack.alignment = .leading
-        sidebarSettingsStack.spacing = 12
-        sidebarSettingsStack.translatesAutoresizingMaskIntoConstraints = false
+        let spacer = NSView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
 
-        let settingsDocument = NSView()
-        settingsDocument.translatesAutoresizingMaskIntoConstraints = false
-        settingsDocument.addSubview(sidebarSettingsStack)
-        let settingsScroll = NSScrollView()
-        settingsScroll.drawsBackground = false
-        settingsScroll.hasVerticalScroller = true
-        settingsScroll.autohidesScrollers = true
-        settingsScroll.documentView = settingsDocument
-
-        let stack = NSStackView(views: [identity, settingsTitle, navigation, separator(), settingsScroll])
+        let stack = NSStackView(views: [identity, settingsTitle, navigation, spacer])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 14
@@ -473,13 +597,7 @@ final class DebugWindowController: NSWindowController,
             stack.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: -18),
             stack.topAnchor.constraint(equalTo: sidebar.safeAreaLayoutGuide.topAnchor, constant: 18),
             stack.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor, constant: -18),
-            settingsScroll.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            settingsScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
-            settingsDocument.widthAnchor.constraint(equalTo: settingsScroll.contentView.widthAnchor),
-            sidebarSettingsStack.leadingAnchor.constraint(equalTo: settingsDocument.leadingAnchor),
-            sidebarSettingsStack.trailingAnchor.constraint(equalTo: settingsDocument.trailingAnchor),
-            sidebarSettingsStack.topAnchor.constraint(equalTo: settingsDocument.topAnchor),
-            sidebarSettingsStack.bottomAnchor.constraint(equalTo: settingsDocument.bottomAnchor)
+            spacer.heightAnchor.constraint(greaterThanOrEqualToConstant: 1)
         ])
         return sidebar
     }
@@ -488,53 +606,36 @@ final class DebugWindowController: NSWindowController,
         let dashboard = NSView()
         dashboard.translatesAutoresizingMaskIntoConstraints = false
 
-        let headline = NSTextField(labelWithString: "Shelf Preview")
-        headline.font = .systemFont(ofSize: 30, weight: .bold)
-        let description = NSTextField(labelWithString: "A live preview of what appears on your Touch Bar.")
-        description.font = .systemFont(ofSize: 13)
-        description.textColor = .secondaryLabelColor
-        let headingText = NSStackView(views: [headline, description])
-        headingText.orientation = .vertical
-        headingText.alignment = .leading
-        headingText.spacing = 3
+        mainContentStack.orientation = .vertical
+        mainContentStack.alignment = .leading
+        mainContentStack.spacing = 16
+        mainContentStack.translatesAutoresizingMaskIntoConstraints = false
 
-        previewCountLabel.font = .systemFont(ofSize: 12, weight: .semibold)
-        previewCountLabel.textColor = .secondaryLabelColor
+        let document = TopAlignedDocumentView()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(mainContentStack)
 
-        let presentButton = modernButton("Present Shelf", style: .primary, action: #selector(presentTouchBar), width: 126)
-        let reloadButton = modernButton("Reload", style: .primary, action: #selector(reloadShelf), width: 88)
-        let closeButton = modernButton("Close Shelf", style: .secondary, action: #selector(dismissTouchBar), width: 108)
-        let clearButton = modernButton("Clear", style: .danger, action: #selector(clearShelf), width: 76)
-        let actions = NSStackView(views: [presentButton, reloadButton, closeButton, clearButton])
-        actions.orientation = .horizontal
-        actions.spacing = 9
-
-        let headerSpacer = NSView()
-        let header = NSStackView(views: [headingText, headerSpacer, previewCountLabel])
-        header.orientation = .horizontal
-        header.alignment = .centerY
-        header.spacing = 12
-
-        let previewCard = makePreviewCard()
-        let filesCard = makeFilesCard()
-
-        let stack = NSStackView(views: [header, actions, previewCard, filesCard])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 16
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        dashboard.addSubview(stack)
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.documentView = document
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        mainContentScrollView = scroll
+        dashboard.addSubview(scroll)
 
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: dashboard.leadingAnchor, constant: 34),
-            stack.trailingAnchor.constraint(equalTo: dashboard.trailingAnchor, constant: -34),
-            stack.topAnchor.constraint(equalTo: dashboard.safeAreaLayoutGuide.topAnchor, constant: 26),
-            stack.bottomAnchor.constraint(equalTo: dashboard.bottomAnchor, constant: -30),
-            header.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            actions.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor),
-            previewCard.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            filesCard.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            filesCard.heightAnchor.constraint(greaterThanOrEqualToConstant: 320)
+            scroll.leadingAnchor.constraint(equalTo: dashboard.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: dashboard.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: dashboard.safeAreaLayoutGuide.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: dashboard.bottomAnchor),
+
+            document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+            document.heightAnchor.constraint(greaterThanOrEqualTo: scroll.contentView.heightAnchor),
+            mainContentStack.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 40),
+            mainContentStack.trailingAnchor.constraint(lessThanOrEqualTo: document.trailingAnchor, constant: -40),
+            mainContentStack.topAnchor.constraint(equalTo: document.topAnchor, constant: 36),
+            mainContentStack.bottomAnchor.constraint(lessThanOrEqualTo: document.bottomAnchor, constant: -36)
         ])
         return dashboard
     }
@@ -644,6 +745,7 @@ final class DebugWindowController: NSWindowController,
     }
 
     private func configureTable() {
+        guard tableView.tableColumns.isEmpty else { return }
         let columns: [(String, String, CGFloat, CGFloat)] = [
             ("thumbnail", "", 58, 58),
             ("name", "Name", 180, 120),
@@ -684,32 +786,35 @@ final class DebugWindowController: NSWindowController,
         }
 
         let update = { [self] in
-            for view in sidebarSettingsStack.arrangedSubviews {
-                sidebarSettingsStack.removeArrangedSubview(view)
+            for view in mainContentStack.arrangedSubviews {
+                mainContentStack.removeArrangedSubview(view)
                 view.removeFromSuperview()
             }
-            sidebarSettingsStack.addArrangedSubview(sectionTitle(page.title.uppercased()))
+            mainContentStack.addArrangedSubview(sectionTitle(page.title.uppercased()))
             switch page {
             case .general:
                 buildGeneralSettings()
             case .appearance:
                 buildAppearanceSettings()
+            case .features:
+                buildFeatureSettings()
             case .shelf:
                 buildShelfSettings()
-            case .developer:
-                buildDeveloperSettings()
+            case .about:
+                buildAboutSettings()
             }
+            scrollMainContentToTop()
         }
 
         if animated {
             NSAnimationContext.runAnimationGroup({ context in
                 context.duration = 0.10
-                sidebarSettingsStack.animator().alphaValue = 0.15
+                mainContentStack.animator().alphaValue = 0.15
             }, completionHandler: {
                 update()
                 NSAnimationContext.runAnimationGroup { context in
                     context.duration = 0.18
-                    self.sidebarSettingsStack.animator().alphaValue = 1
+                    self.mainContentStack.animator().alphaValue = 1
                 }
             })
         } else {
@@ -721,7 +826,7 @@ final class DebugWindowController: NSWindowController,
         overlayToggle.setButtonType(.switch)
         overlayToggle.target = self
         overlayToggle.action = #selector(toggleOverlay)
-        sidebarSettingsStack.addArrangedSubview(overlayToggle)
+        mainContentStack.addArrangedSubview(overlayToggle)
 
         if overlayHeightPopup.numberOfItems == 0 {
             overlayHeightPopup.addItems(withTitles:
@@ -730,79 +835,247 @@ final class DebugWindowController: NSWindowController,
             overlayHeightPopup.target = self
             overlayHeightPopup.action = #selector(changeOverlayHeight)
         }
-        sidebarSettingsStack.addArrangedSubview(settingRow(label: "Overlay height", control: overlayHeightPopup))
-        sidebarSettingsStack.addArrangedSubview(caption("Universal AutoDrop accepts supported files, images, text, links, RTF and HTML from any app."))
-        sidebarSettingsStack.addArrangedSubview(statusPill())
+        mainContentStack.addArrangedSubview(settingRow(label: "Overlay height", control: overlayHeightPopup))
+        mainContentStack.addArrangedSubview(caption("Universal AutoDrop accepts supported files, images, text, links, RTF and HTML from any app."))
+        mainContentStack.addArrangedSubview(statusPill())
 
         showDockToggle.setButtonType(.switch)
         showDockToggle.title = "Show in Dock"
-        showDockToggle.state = UserDefaults.standard.bool(forKey: "ShelfBar.showInDock") ? .on : .off
+        showDockToggle.state = settings.showInDock ? .on : .off
         showDockToggle.target = self
         showDockToggle.action = #selector(toggleShowInDock)
-        sidebarSettingsStack.addArrangedSubview(showDockToggle)
+        mainContentStack.addArrangedSubview(showDockToggle)
 
-        floatingButtonToggle.setButtonType(.switch)
-        floatingButtonToggle.title = "Show floating Shelf button after Close"
-        floatingButtonToggle.state = UserDefaults.standard.bool(
-            forKey: "ShelfBar.showFloatingAfterClose"
-        ) ? .on : .off
-        floatingButtonToggle.target = self
-        floatingButtonToggle.action = #selector(toggleFloatingButton)
-        sidebarSettingsStack.addArrangedSubview(floatingButtonToggle)
-
-        airDropZoneToggle.setButtonType(.switch)
-        airDropZoneToggle.title = "Enable AirDrop Zone"
-        airDropZoneToggle.state = UserDefaults.standard.object(forKey: "ShelfBar.enableAirDropZone") == nil
-            || UserDefaults.standard.bool(forKey: "ShelfBar.enableAirDropZone")
-            ? .on : .off
-        airDropZoneToggle.target = self
-        airDropZoneToggle.action = #selector(toggleAirDropZone)
-        sidebarSettingsStack.addArrangedSubview(airDropZoneToggle)
-
-        if floatingAnimationPopup.numberOfItems == 0 {
-            floatingAnimationPopup.addItems(withTitles: ["Instant"])
-            floatingAnimationPopup.target = self
-            floatingAnimationPopup.action = #selector(changeFloatingOpenAnimation)
-        }
-        floatingAnimationPopup.selectItem(withTitle: "Instant")
-        sidebarSettingsStack.addArrangedSubview(
-            settingRow(label: "Floating Button Open", control: floatingAnimationPopup)
-        )
-
-        showDeveloperTabToggle.setButtonType(.switch)
-        showDeveloperTabToggle.title = "Show Developer Tab"
-        showDeveloperTabToggle.state = UserDefaults.standard.bool(forKey: "ShelfBar.showDeveloperTab") ? .on : .off
-        showDeveloperTabToggle.target = self
-        showDeveloperTabToggle.action = #selector(toggleDeveloperTabVisibility)
-        sidebarSettingsStack.addArrangedSubview(showDeveloperTabToggle)
+        mainContentStack.addArrangedSubview(sectionTitle("OPEN SHELF SHORTCUT"))
+        mainContentStack.addArrangedSubview(caption("Use this global shortcut to present ShelfBar after Close. Default is Option-Command-C."))
+        shortcutValueLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        shortcutValueLabel.stringValue = settings.openShelfShortcut.displayText
+        recordShortcutButton.title = "Record Shortcut"
+        recordShortcutButton.target = self
+        recordShortcutButton.action = #selector(recordOpenShelfShortcut)
+        restoreShortcutButton.title = "Restore Default"
+        restoreShortcutButton.target = self
+        restoreShortcutButton.action = #selector(restoreDefaultOpenShelfShortcut)
+        clearShortcutButton.title = "Clear"
+        clearShortcutButton.target = self
+        clearShortcutButton.action = #selector(clearOpenShelfShortcut)
+        let shortcutActions = NSStackView(views: [
+            shortcutValueLabel,
+            recordShortcutButton,
+            restoreShortcutButton,
+            clearShortcutButton
+        ])
+        shortcutActions.orientation = .horizontal
+        shortcutActions.alignment = .centerY
+        shortcutActions.spacing = 10
+        mainContentStack.addArrangedSubview(shortcutActions)
     }
 
     private func buildAppearanceSettings() {
         themeControl.segmentStyle = .rounded
         themeControl.selectedSegment = currentTheme == .auto ? 0 : (currentTheme == .light ? 1 : 2)
-        sidebarSettingsStack.addArrangedSubview(caption("Theme"))
-        sidebarSettingsStack.addArrangedSubview(themeControl)
+        mainContentStack.addArrangedSubview(caption("Theme"))
+        mainContentStack.addArrangedSubview(themeControl)
         themeControl.widthAnchor.constraint(equalToConstant: 210).isActive = true
-        sidebarSettingsStack.addArrangedSubview(caption("Auto follows the current macOS appearance. Light and Dark stay fixed."))
+        mainContentStack.addArrangedSubview(caption("Auto follows the current macOS appearance. Light and Dark stay fixed."))
+
+        mainContentStack.addArrangedSubview(sectionTitle("APP ICON"))
+        mainContentStack.addArrangedSubview(
+            caption("Choose one icon theme. ShelfBar automatically uses the matching Light or Dark icon for the current macOS appearance. Split images are previews only.")
+        )
+        mainContentStack.addArrangedSubview(makeIconThemeGrid())
+        refreshIconThemeSelection()
     }
 
     private func buildShelfSettings() {
-        sidebarSettingsStack.addArrangedSubview(
+        previewCountLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        previewCountLabel.textColor = .secondaryLabelColor
+        let description = caption("A live preview of what appears on your Touch Bar. Shelf Preview now lives inside the Shelf settings page instead of being pinned beside every category.")
+        mainContentStack.addArrangedSubview(description)
+
+        let present = modernButton("Present Shelf", style: .primary, action: #selector(presentTouchBar), width: 126)
+        let reload = modernButton("Reload", style: .primary, action: #selector(reloadShelf), width: 88)
+        let close = modernButton("Close Shelf", style: .secondary, action: #selector(dismissTouchBar), width: 108)
+        let clear = modernButton("Clear", style: .danger, action: #selector(clearShelf), width: 76)
+        let actions = NSStackView(views: [present, reload, close, clear, previewCountLabel])
+        actions.orientation = .horizontal
+        actions.alignment = .centerY
+        actions.spacing = 9
+        mainContentStack.addArrangedSubview(actions)
+
+        mainContentStack.addArrangedSubview(shelfPreviewCard)
+        mainContentStack.addArrangedSubview(shelfFilesCard)
+        if !shelfPageConstraintsInstalled {
+            shelfPreviewCard.widthAnchor.constraint(equalTo: mainContentStack.widthAnchor).isActive = true
+            shelfFilesCard.widthAnchor.constraint(equalTo: mainContentStack.widthAnchor).isActive = true
+            shelfFilesCard.heightAnchor.constraint(greaterThanOrEqualToConstant: 320).isActive = true
+            shelfPageConstraintsInstalled = true
+        }
+
+        mainContentStack.addArrangedSubview(
             caption("Create a Stack on the Touch Bar: drag one Shelf file onto another, hold for 0.55 seconds until the blue ready outline appears, then release.")
         )
         autoDissolveToggle.setButtonType(.switch)
         autoDissolveToggle.title = "Auto dissolve single-item stack"
-        autoDissolveToggle.state = UserDefaults.standard.bool(
-            forKey: "ShelfBar.autoDissolveSingleItemStack"
-        ) ? .on : .off
+        autoDissolveToggle.state = settings.autoDissolveSingleItemStack ? .on : .off
         autoDissolveToggle.target = self
         autoDissolveToggle.action = #selector(toggleAutoDissolveStack)
-        sidebarSettingsStack.addArrangedSubview(autoDissolveToggle)
-        let present = modernButton("Present Shelf", style: .primary, action: #selector(presentTouchBar), width: 210)
-        let reload = modernButton("Reload", style: .primary, action: #selector(reloadShelf), width: 210)
-        let close = modernButton("Close Shelf", style: .secondary, action: #selector(dismissTouchBar), width: 210)
-        let clear = modernButton("Clear", style: .danger, action: #selector(clearShelf), width: 210)
-        [present, reload, close, clear].forEach(sidebarSettingsStack.addArrangedSubview)
+        mainContentStack.addArrangedSubview(autoDissolveToggle)
+
+        mainContentStack.addArrangedSubview(sectionTitle("CLIPBOARD SHELF"))
+        mainContentStack.addArrangedSubview(caption("Clipboard Shelf keeps recent copied text, links, images and file URLs in ShelfBar. It uses the same Touch Bar surface as File Shelf."))
+        clipboardShelfToggle.setButtonType(.switch)
+        clipboardShelfToggle.title = "Enable Clipboard Shelf"
+        clipboardShelfToggle.state = settings.isFeatureEnabled(.clipboardShelf) ? .on : .off
+        clipboardShelfToggle.target = self
+        clipboardShelfToggle.action = #selector(toggleClipboardShelfFromShelfPage)
+        mainContentStack.addArrangedSubview(clipboardShelfToggle)
+
+        clipboardCaptureTextToggle.setButtonType(.switch)
+        clipboardCaptureTextToggle.title = "Capture Text"
+        clipboardCaptureTextToggle.state = settings.captureClipboardText ? .on : .off
+        clipboardCaptureTextToggle.target = self
+        clipboardCaptureTextToggle.action = #selector(toggleClipboardCaptureText)
+        mainContentStack.addArrangedSubview(clipboardCaptureTextToggle)
+
+        clipboardCaptureURLToggle.setButtonType(.switch)
+        clipboardCaptureURLToggle.title = "Capture URLs"
+        clipboardCaptureURLToggle.state = settings.captureClipboardURLs ? .on : .off
+        clipboardCaptureURLToggle.target = self
+        clipboardCaptureURLToggle.action = #selector(toggleClipboardCaptureURLs)
+        mainContentStack.addArrangedSubview(clipboardCaptureURLToggle)
+
+        clipboardCaptureImageToggle.setButtonType(.switch)
+        clipboardCaptureImageToggle.title = "Capture Images"
+        clipboardCaptureImageToggle.state = settings.captureClipboardImages ? .on : .off
+        clipboardCaptureImageToggle.target = self
+        clipboardCaptureImageToggle.action = #selector(toggleClipboardCaptureImages)
+        mainContentStack.addArrangedSubview(clipboardCaptureImageToggle)
+
+        clipboardCaptureFileToggle.setButtonType(.switch)
+        clipboardCaptureFileToggle.title = "Capture File URLs"
+        clipboardCaptureFileToggle.state = settings.captureClipboardFiles ? .on : .off
+        clipboardCaptureFileToggle.target = self
+        clipboardCaptureFileToggle.action = #selector(toggleClipboardCaptureFiles)
+        mainContentStack.addArrangedSubview(clipboardCaptureFileToggle)
+
+        configurePopup(clipboardHistoryPopup, titles: ["10", "20", "50", "100"], action: #selector(changeClipboardHistoryLimit))
+        clipboardHistoryPopup.selectItem(withTitle: "\(settings.maxClipboardHistory)")
+        mainContentStack.addArrangedSubview(settingRow(label: "Clipboard History", control: clipboardHistoryPopup))
+
+        let clearClipboard = modernButton("Clear Clipboard History", style: .danger, action: #selector(clearClipboardHistory), width: 190)
+        mainContentStack.addArrangedSubview(clearClipboard)
+
+        mainContentStack.addArrangedSubview(sectionTitle("COUNTERS AND RECENTS"))
+        dropCounterSizeToggle.setButtonType(.switch)
+        dropCounterSizeToggle.title = "Show total file size in Drop Counter"
+        dropCounterSizeToggle.state = settings.showDropCounterTotalSize ? .on : .off
+        dropCounterSizeToggle.target = self
+        dropCounterSizeToggle.action = #selector(toggleDropCounterSize)
+        mainContentStack.addArrangedSubview(dropCounterSizeToggle)
+
+        configurePopup(recentLimitPopup, titles: ["5", "10", "20", "50"], action: #selector(changeRecentLimit))
+        recentLimitPopup.selectItem(withTitle: "\(settings.recentFilesLimit)")
+        mainContentStack.addArrangedSubview(settingRow(label: "Recent Items", control: recentLimitPopup))
+
+        let clearRecent = modernButton("Clear Recent Items", style: .danger, action: #selector(clearRecentItems), width: 160)
+        mainContentStack.addArrangedSubview(clearRecent)
+    }
+
+    private func buildFeatureSettings() {
+        featureToggles.removeAll()
+        mainContentStack.addArrangedSubview(caption("All feature switches are live. Changes rebuild the Touch Bar immediately and persist after restarting ShelfBar."))
+        for feature in ShelfBarFeature.allCases {
+            let toggle = featureToggle(for: feature)
+            mainContentStack.addArrangedSubview(toggle)
+            mainContentStack.addArrangedSubview(caption(feature.phaseStatusNote))
+            featureToggles[feature] = toggle
+            if feature == .airDrop {
+                airDropZoneToggle.state = toggle.state
+            }
+        }
+    }
+
+    private func buildAboutSettings() {
+        let aboutLogo = ShelfBarLogoImageView()
+        aboutLogo.imageScaling = .scaleProportionallyDown
+        aboutLogo.translatesAutoresizingMaskIntoConstraints = false
+        aboutLogo.widthAnchor.constraint(equalToConstant: 76).isActive = true
+        aboutLogo.heightAnchor.constraint(equalToConstant: 76).isActive = true
+        mainContentStack.addArrangedSubview(aboutLogo)
+
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+        mainContentStack.addArrangedSubview(caption("ShelfBar \(version) (\(build))"))
+        mainContentStack.addArrangedSubview(caption("Phase 2A settings navigation and honest feature-state build."))
+
+        showDeveloperTabToggle.setButtonType(.switch)
+        showDeveloperTabToggle.title = "Show Developer Tools"
+        showDeveloperTabToggle.state = UserDefaults.standard.bool(forKey: ShelfBarSettingsKey.showDeveloperTab) ? .on : .off
+        showDeveloperTabToggle.target = self
+        showDeveloperTabToggle.action = #selector(toggleDeveloperTabVisibility)
+        mainContentStack.addArrangedSubview(showDeveloperTabToggle)
+
+        if showDeveloperTabToggle.state == .on {
+            buildDeveloperSettings()
+        }
+    }
+
+    private func featureToggle(for feature: ShelfBarFeature) -> NSButton {
+        let toggle = NSButton()
+        toggle.setButtonType(.switch)
+        toggle.title = feature.title
+        toggle.state = settings.isFeatureEnabled(feature) ? .on : .off
+        toggle.target = self
+        toggle.action = #selector(toggleFeature(_:))
+        toggle.tag = ShelfBarFeature.allCases.firstIndex(of: feature) ?? 0
+        toggle.isEnabled = feature.isImplemented
+        return toggle
+    }
+
+    private func makeIconThemeGrid() -> NSStackView {
+        iconThemeButtons.removeAll()
+        let rows = NSStackView()
+        rows.orientation = .vertical
+        rows.alignment = .leading
+        rows.spacing = 12
+
+        let themes = ShelfBarIconTheme.allCases
+        for chunkStart in stride(from: 0, to: themes.count, by: 3) {
+            let row = NSStackView()
+            row.orientation = .horizontal
+            row.alignment = .centerY
+            row.spacing = 12
+            for theme in themes[chunkStart..<min(chunkStart + 3, themes.count)] {
+                let button = ShelfBarIconThemeButton(
+                    theme: theme,
+                    target: self,
+                    action: #selector(selectIconTheme(_:))
+                )
+                button.tag = ShelfBarIconTheme.allCases.firstIndex(of: theme) ?? 0
+                iconThemeButtons[theme] = button
+                row.addArrangedSubview(button)
+            }
+            rows.addArrangedSubview(row)
+        }
+        return rows
+    }
+
+    private func refreshIconThemeSelection() {
+        let selected = ShelfBarIconTheme.current
+        for (theme, button) in iconThemeButtons {
+            button.isSelectedTheme = theme == selected
+        }
+    }
+
+    private func scrollMainContentToTop() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  let scrollView = self.mainContentScrollView
+            else { return }
+            scrollView.contentView.scroll(to: NSPoint(x: 0, y: 0))
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
     }
 
     private func buildDeveloperSettings() {
@@ -810,7 +1083,7 @@ final class DebugWindowController: NSWindowController,
         developerToggle.title = "Enable Developer Tools"
         developerToggle.target = self
         developerToggle.action = #selector(toggleDeveloperMode)
-        sidebarSettingsStack.addArrangedSubview(developerToggle)
+        mainContentStack.addArrangedSubview(developerToggle)
 
         researchToggle.setButtonType(.switch)
         researchToggle.title = "MouseBridge Research"
@@ -845,10 +1118,14 @@ final class DebugWindowController: NSWindowController,
         logScroll.widthAnchor.constraint(equalToConstant: 210).isActive = true
 
         let clearLog = modernButton("Clear Logs", style: .secondary, action: #selector(clearDragLog), width: 210)
+        let dumpInteraction = modernButton("Dump Interaction State", style: .secondary, action: #selector(dumpInteractionState), width: 210)
+        let stressInteraction = modernButton("Run Interaction Stress", style: .secondary, action: #selector(runInteractionStress), width: 210)
         developerDetailStack.setViews([
             researchToggle,
             finderPromiseToggle,
             researchStatusLabel,
+            dumpInteraction,
+            stressInteraction,
             clearLog,
             logScroll
         ], in: .top)
@@ -856,7 +1133,7 @@ final class DebugWindowController: NSWindowController,
         developerDetailStack.alignment = .leading
         developerDetailStack.spacing = 10
         developerDetailStack.isHidden = developerToggle.state != .on
-        sidebarSettingsStack.addArrangedSubview(developerDetailStack)
+        mainContentStack.addArrangedSubview(developerDetailStack)
     }
 
     private func updateOverlayControls() {
@@ -1092,6 +1369,8 @@ final class DebugWindowController: NSWindowController,
             NSApp.appearance = appearance
             self.window?.appearance = appearance
             self.logoImageView.refreshBrandImage()
+            self.appearanceDidChange()
+            ShelfBarIconTheme.updateApplicationIcon()
         }
         guard animated else {
             update()
@@ -1107,6 +1386,15 @@ final class DebugWindowController: NSWindowController,
                 self.rootEffect.animator().alphaValue = 1
             }
         })
+    }
+
+    func appearanceDidChange() {
+        logoImageView.refreshBrandImage()
+        for button in iconThemeButtons.values {
+            button.refreshForAppearance()
+        }
+        rootEffect.needsDisplay = true
+        mainContentStack.needsDisplay = true
     }
 
     private func appendDragLog(_ entry: String) {
@@ -1156,7 +1444,7 @@ final class DebugWindowController: NSWindowController,
         label.textColor = .secondaryLabelColor
         label.maximumNumberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.widthAnchor.constraint(lessThanOrEqualToConstant: 210).isActive = true
+        label.widthAnchor.constraint(lessThanOrEqualToConstant: 680).isActive = true
         return label
     }
 
@@ -1179,6 +1467,14 @@ final class DebugWindowController: NSWindowController,
         row.translatesAutoresizingMaskIntoConstraints = false
         row.widthAnchor.constraint(equalToConstant: 210).isActive = true
         return row
+    }
+
+    private func configurePopup(_ popup: NSPopUpButton, titles: [String], action: Selector) {
+        if popup.numberOfItems == 0 {
+            popup.addItems(withTitles: titles)
+            popup.target = self
+            popup.action = action
+        }
     }
 
     private func statusPill() -> NSVisualEffectView {
@@ -1236,6 +1532,13 @@ final class DebugWindowController: NSWindowController,
         applyTheme(theme, animated: true)
     }
 
+    @objc private func selectIconTheme(_ sender: NSButton) {
+        guard ShelfBarIconTheme.allCases.indices.contains(sender.tag) else { return }
+        let theme = ShelfBarIconTheme.allCases[sender.tag]
+        ShelfBarIconTheme.setCurrent(theme)
+        refreshIconThemeSelection()
+    }
+
     func setThemeFromMenu(index: Int) {
         themeControl.selectedSegment = min(max(index, 0), 2)
         changeTheme()
@@ -1247,15 +1550,48 @@ final class DebugWindowController: NSWindowController,
 
     func openPreferences(page: Int = 0) {
         let target = SidebarPage(rawValue: page) ?? .general
-        if target == .developer,
-           !UserDefaults.standard.bool(forKey: "ShelfBar.showDeveloperTab") {
-            showSidebarPage(.general, animated: false)
-        } else {
-            showSidebarPage(target, animated: false)
-        }
+        showSidebarPage(target, animated: false)
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+    }
+
+    func settingsDidChange(_ change: AppSettingsStore.Change) {
+        switch change {
+        case let .feature(feature, enabled):
+            featureToggles[feature]?.state = enabled ? .on : .off
+            if feature == .airDrop {
+                airDropZoneToggle.state = enabled ? .on : .off
+            } else if feature == .clipboardShelf {
+                clipboardShelfToggle.state = enabled ? .on : .off
+            }
+            if selectedPage == .features || selectedPage == .shelf {
+                showSidebarPage(selectedPage, animated: false)
+            }
+        case let .general(key):
+            if key == ShelfBarSettingsKey.showInDock {
+                showDockToggle.state = settings.showInDock ? .on : .off
+        } else if key == ShelfBarSettingsKey.autoDissolveSingleItemStack {
+            autoDissolveToggle.state = settings.autoDissolveSingleItemStack ? .on : .off
+        } else if key == ShelfBarSettingsKey.captureClipboardText {
+            clipboardCaptureTextToggle.state = settings.captureClipboardText ? .on : .off
+        } else if key == ShelfBarSettingsKey.captureClipboardURLs {
+            clipboardCaptureURLToggle.state = settings.captureClipboardURLs ? .on : .off
+        } else if key == ShelfBarSettingsKey.captureClipboardImages {
+            clipboardCaptureImageToggle.state = settings.captureClipboardImages ? .on : .off
+        } else if key == ShelfBarSettingsKey.captureClipboardFiles {
+            clipboardCaptureFileToggle.state = settings.captureClipboardFiles ? .on : .off
+        } else if key == ShelfBarSettingsKey.showDropCounterTotalSize {
+            dropCounterSizeToggle.state = settings.showDropCounterTotalSize ? .on : .off
+        } else if key == ShelfBarSettingsKey.maxClipboardHistory {
+            clipboardHistoryPopup.selectItem(withTitle: "\(settings.maxClipboardHistory)")
+        } else if key == ShelfBarSettingsKey.recentFilesLimit {
+            recentLimitPopup.selectItem(withTitle: "\(settings.recentFilesLimit)")
+        } else if key == ShelfBarSettingsKey.openShelfShortcutKeyCode {
+            shortcutValueLabel.stringValue = settings.openShelfShortcut.displayText
+        }
+        }
+        rebuildPreview()
     }
 
     @objc private func clearShelf() {
@@ -1352,40 +1688,130 @@ final class DebugWindowController: NSWindowController,
 
     @objc private func toggleShowInDock() {
         let enabled = showDockToggle.state == .on
-        UserDefaults.standard.set(enabled, forKey: "ShelfBar.showInDock")
+        settings.setShowInDock(enabled)
         onDockPreferenceChange?(enabled)
     }
 
-    @objc private func toggleFloatingButton() {
-        let enabled = floatingButtonToggle.state == .on
-        UserDefaults.standard.set(enabled, forKey: "ShelfBar.showFloatingAfterClose")
-        onFloatingButtonPreferenceChange?(enabled)
+    @objc private func recordOpenShelfShortcut() {
+        recordShortcutButton.title = "Press Shortcut..."
+        shortcutValueLabel.stringValue = "Recording..."
+        shortcutRecorderMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+            [weak self] event in
+            guard let self else { return event }
+            self.finishRecordingShortcut(event)
+            return nil
+        }
+    }
+
+    @objc private func restoreDefaultOpenShelfShortcut() {
+        stopRecordingShortcut()
+        settings.restoreDefaultOpenShelfShortcut()
+        shortcutValueLabel.stringValue = settings.openShelfShortcut.displayText
+    }
+
+    @objc private func clearOpenShelfShortcut() {
+        stopRecordingShortcut()
+        settings.clearOpenShelfShortcut()
+        shortcutValueLabel.stringValue = settings.openShelfShortcut.displayText
+    }
+
+    private func finishRecordingShortcut(_ event: NSEvent) {
+        let modifiers = Self.carbonModifiers(from: event.modifierFlags)
+        guard modifiers != 0 else {
+            NSSound.beep()
+            stopRecordingShortcut()
+            shortcutValueLabel.stringValue = settings.openShelfShortcut.displayText
+            return
+        }
+        settings.setOpenShelfShortcut(
+            ShelfBarKeyboardShortcut(keyCode: UInt32(event.keyCode), modifiers: modifiers)
+        )
+        stopRecordingShortcut()
+        shortcutValueLabel.stringValue = settings.openShelfShortcut.displayText
+    }
+
+    private func stopRecordingShortcut() {
+        if let shortcutRecorderMonitor {
+            NSEvent.removeMonitor(shortcutRecorderMonitor)
+        }
+        shortcutRecorderMonitor = nil
+        recordShortcutButton.title = "Record Shortcut"
+    }
+
+    private static func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
+        var result: UInt32 = 0
+        if flags.contains(.command) { result |= UInt32(cmdKey) }
+        if flags.contains(.option) { result |= UInt32(optionKey) }
+        if flags.contains(.control) { result |= UInt32(controlKey) }
+        if flags.contains(.shift) { result |= UInt32(shiftKey) }
+        return result
     }
 
     @objc private func toggleAirDropZone() {
-        UserDefaults.standard.set(airDropZoneToggle.state == .on, forKey: "ShelfBar.enableAirDropZone")
+        settings.setFeature(.airDrop, enabled: airDropZoneToggle.state == .on)
     }
 
-    @objc private func changeFloatingOpenAnimation() {
-        UserDefaults.standard.set("instant", forKey: "ShelfBar.floatingOpenAnimation")
+    @objc private func toggleFeature(_ sender: NSButton) {
+        guard ShelfBarFeature.allCases.indices.contains(sender.tag) else { return }
+        let feature = ShelfBarFeature.allCases[sender.tag]
+        settings.setFeature(feature, enabled: sender.state == .on)
     }
 
     @objc private func toggleAutoDissolveStack() {
         let enabled = autoDissolveToggle.state == .on
-        UserDefaults.standard.set(enabled, forKey: "ShelfBar.autoDissolveSingleItemStack")
+        settings.setAutoDissolveSingleItemStack(enabled)
         if enabled {
             touchBarController.normalizeStacksForCurrentPreference()
         }
     }
 
+    @objc private func toggleClipboardShelfFromShelfPage() {
+        settings.setFeature(.clipboardShelf, enabled: clipboardShelfToggle.state == .on)
+    }
+
+    @objc private func toggleClipboardCaptureText() {
+        settings.setCaptureClipboardText(clipboardCaptureTextToggle.state == .on)
+    }
+
+    @objc private func toggleClipboardCaptureURLs() {
+        settings.setCaptureClipboardURLs(clipboardCaptureURLToggle.state == .on)
+    }
+
+    @objc private func toggleClipboardCaptureImages() {
+        settings.setCaptureClipboardImages(clipboardCaptureImageToggle.state == .on)
+    }
+
+    @objc private func toggleClipboardCaptureFiles() {
+        settings.setCaptureClipboardFiles(clipboardCaptureFileToggle.state == .on)
+    }
+
+    @objc private func changeClipboardHistoryLimit() {
+        guard let value = Int(clipboardHistoryPopup.selectedItem?.title ?? "") else { return }
+        settings.setMaxClipboardHistory(value)
+    }
+
+    @objc private func clearClipboardHistory() {
+        clipboardStore.clear(includePinned: true, clearSystemPasteboard: true)
+    }
+
+    @objc private func toggleDropCounterSize() {
+        settings.setShowDropCounterTotalSize(dropCounterSizeToggle.state == .on)
+    }
+
+    @objc private func changeRecentLimit() {
+        guard let value = Int(recentLimitPopup.selectedItem?.title ?? "") else { return }
+        settings.setRecentFilesLimit(value)
+    }
+
+    @objc private func clearRecentItems() {
+        recentItemsStore.clear()
+    }
+
     @objc private func toggleDeveloperTabVisibility() {
         let visible = showDeveloperTabToggle.state == .on
-        UserDefaults.standard.set(visible, forKey: "ShelfBar.showDeveloperTab")
-        if let button = sidebarButtons.first(where: { $0.tag == SidebarPage.developer.rawValue }) {
-            button.isHidden = !visible
-        }
-        if !visible, selectedPage == .developer {
-            showSidebarPage(.general, animated: true)
+        settings.setShowDeveloperTab(visible)
+        if selectedPage == .about {
+            showSidebarPage(.about, animated: true)
         }
     }
 
@@ -1435,6 +1861,14 @@ final class DebugWindowController: NSWindowController,
 
     @objc private func clearDragLog() {
         dragLogTextView.string = ""
+    }
+
+    @objc private func dumpInteractionState() {
+        touchBarController.dumpInteractionDebugState(reason: "developer-button")
+    }
+
+    @objc private func runInteractionStress() {
+        touchBarController.runInteractionStabilityStressTest(iterations: 200)
     }
 
     @objc private func showAbout() {
