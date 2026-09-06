@@ -1,5 +1,5 @@
 const featureOrder = ["files", "clips", "search", "stack", "pin", "recent", "drop"];
-const touchbarAssetVersion = "touchbar-20260906-006";
+const touchbarAssetVersion = "touchbar-20260906-007";
 
 function touchbarAsset(path) {
   return `${path}?v=${touchbarAssetVersion}`;
@@ -341,6 +341,7 @@ function updateStoryFeature() {
     const feature = getFeature(key);
     const lineItems = feature.storyLines || [feature.copy];
     document.documentElement.style.setProperty("--story-progress", "0");
+    document.documentElement.style.setProperty("--story-media-clarity", "1");
     if (title) title.textContent = feature.headline;
     if (lines) {
       renderStoryLines(lines, lineItems);
@@ -365,6 +366,7 @@ function updateStoryFeature() {
   if (lines) {
     renderStoryLines(lines, lineItems);
     setStoryLineBrightness(lines, featureProgress);
+    setStoryMediaClarity(lines, featureProgress);
   }
   applyFeatureToStage(stage, key);
   if (featureChanged) {
@@ -407,6 +409,19 @@ function renderStoryLines(container, lineItems) {
   container.replaceChildren(...lineNodes);
   container.dataset.storyText = signature;
   container.dataset.storyCharCount = String(characterIndex);
+}
+
+function setStoryMediaClarity(container, progress) {
+  const total = Number(container.dataset.storyCharCount || 0);
+  if (!total || prefersReducedMotion.matches) {
+    document.documentElement.style.setProperty("--story-media-clarity", "1");
+    return;
+  }
+
+  const oneCharacterProgress = 1 / total;
+  const clarityThreshold = Math.min(0.085, Math.max(0.022, oneCharacterProgress * 1.15));
+  const clarity = clamp(progress / clarityThreshold);
+  document.documentElement.style.setProperty("--story-media-clarity", clarity.toFixed(3));
 }
 
 function setStoryLineBrightness(container, progress) {
