@@ -1,5 +1,5 @@
 const featureOrder = ["files", "clips", "search", "stack", "pin", "recent", "drop"];
-const touchbarAssetVersion = "touchbar-20260906-007";
+const touchbarAssetVersion = "touchbar-20260906-008";
 
 function touchbarAsset(path) {
   return `${path}?v=${touchbarAssetVersion}`;
@@ -131,10 +131,12 @@ const appTabs = {
 
 const videoExtensions = ["mp4", "webm", "mov"];
 const productStages = new Set();
+const imagePreloadCache = new Map();
 let featureVideos = {};
 let carouselIndex = 0;
 let carouselTimer = 0;
 let carouselPaused = false;
+let carouselSwitchToken = 0;
 let storyFeatureKey = "";
 
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -149,6 +151,40 @@ function getFeature(key) {
 
 function canProbeAssets() {
   return window.location.protocol === "http:" || window.location.protocol === "https:";
+}
+
+function preloadImage(src) {
+  if (!src) return Promise.resolve();
+  if (imagePreloadCache.has(src)) return imagePreloadCache.get(src);
+
+  const image = new Image();
+  image.decoding = "async";
+  image.src = src;
+
+  const ready = image.decode
+    ? image.decode().catch(() => {})
+    : new Promise(resolve => {
+      image.onload = resolve;
+      image.onerror = resolve;
+    });
+
+  imagePreloadCache.set(src, ready);
+  return ready;
+}
+
+function preloadFeatureAssets(key) {
+  const feature = getFeature(key);
+  return Promise.all([
+    preloadImage(feature.image),
+    preloadImage(feature.appImage)
+  ]);
+}
+
+function preloadSiteImages() {
+  featureOrder.forEach(key => {
+    preloadFeatureAssets(key);
+  });
+  Object.values(appTabs).forEach(tab => preloadImage(tab.image));
 }
 
 async function fileExists(path) {
@@ -287,9 +323,13 @@ function prepareCarouselSlide(direction) {
   };
 }
 
-function updateCarousel(index, direction = 1) {
-  const runSlide = prepareCarouselSlide(direction);
+async function updateCarousel(index, direction = 1) {
+  const switchToken = ++carouselSwitchToken;
   const featureKey = featureOrder[(index + featureOrder.length) % featureOrder.length];
+  await preloadFeatureAssets(featureKey);
+  if (switchToken !== carouselSwitchToken) return;
+
+  const runSlide = prepareCarouselSlide(direction);
   const feature = getFeature(featureKey);
   const stage = document.querySelector("[data-carousel-stage]");
   const eyebrow = document.querySelector("[data-carousel-eyebrow]");
@@ -310,7 +350,9 @@ function updateCarousel(index, direction = 1) {
 function scheduleCarousel() {
   window.clearInterval(carouselTimer);
   if (!carouselPaused && !prefersReducedMotion.matches) {
-    carouselTimer = window.setInterval(() => updateCarousel(carouselIndex + 1, 1), 4600);
+    carouselTimer = window.setInterval(() => {
+      updateCarousel(carouselIndex + 1, 1);
+    }, 4600);
   }
 }
 
@@ -621,6 +663,7 @@ function armQA() {
 }
 
 initializeStages();
+preloadSiteImages();
 armReveals();
 armHighlighter();
 armCarousel();
