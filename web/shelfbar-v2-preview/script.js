@@ -1,5 +1,5 @@
 const featureOrder = ["files", "clips", "search", "stack", "pin", "recent", "drop"];
-const touchbarAssetVersion = "touchbar-20260907-mobile-story-001";
+const touchbarAssetVersion = "touchbar-20260907-release-text-001";
 
 function touchbarAsset(path) {
   return `${path}?v=${touchbarAssetVersion}`;

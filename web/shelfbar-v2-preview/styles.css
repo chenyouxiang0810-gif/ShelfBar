@@ -1017,6 +1017,10 @@ button {
   gap: clamp(10px, 1.8vw, 18px);
 }
 
+.release-inner h2 {
+  color: #1d1d1f;
+}
+
 .release-logo {
   width: clamp(58px, 7vw, 90px);
   height: clamp(58px, 7vw, 90px);
