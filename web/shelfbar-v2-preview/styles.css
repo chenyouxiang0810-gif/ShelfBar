@@ -1326,6 +1326,35 @@ button {
 
 }
 
+@media (max-width: 834px) {
+  .story {
+    min-height: 780svh;
+  }
+
+  .story-layout {
+    position: sticky;
+    top: var(--header-h);
+    align-content: center;
+    min-height: calc(100svh - var(--header-h));
+    padding-top: clamp(24px, 7svh, 56px);
+    padding-bottom: clamp(28px, 8svh, 64px);
+  }
+
+  .story-copy {
+    justify-self: stretch;
+    width: min(100%, 620px);
+    text-align: left;
+  }
+
+  .story-product {
+    width: 100%;
+  }
+
+  .story-product .touchbar-shot {
+    width: min(100%, 680px);
+  }
+}
+
 @media (max-width: 700px) {
   :root {
     --gutter: clamp(16px, 5vw, 28px);

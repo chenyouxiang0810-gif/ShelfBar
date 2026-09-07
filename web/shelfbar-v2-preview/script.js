@@ -1,5 +1,5 @@
 const featureOrder = ["files", "clips", "search", "stack", "pin", "recent", "drop"];
-const touchbarAssetVersion = "touchbar-20260906-008";
+const touchbarAssetVersion = "touchbar-20260907-mobile-story-001";
 
 function touchbarAsset(path) {
   return `${path}?v=${touchbarAssetVersion}`;
@@ -377,21 +377,6 @@ function updateStoryFeature() {
   const lines = document.querySelector("[data-story-lines]");
 
   if (!story || !stage) return;
-
-  if (window.matchMedia("(max-width: 834px)").matches) {
-    const key = featureOrder[carouselIndex] || "files";
-    const feature = getFeature(key);
-    const lineItems = feature.storyLines || [feature.copy];
-    document.documentElement.style.setProperty("--story-progress", "0");
-    document.documentElement.style.setProperty("--story-media-clarity", "1");
-    if (title) title.textContent = feature.headline;
-    if (lines) {
-      renderStoryLines(lines, lineItems);
-      setStoryLineBrightness(lines, 1);
-    }
-    applyFeatureToStage(stage, key);
-    return;
-  }
 
   const rect = story.getBoundingClientRect();
   const travel = Math.max(1, rect.height - window.innerHeight);
