@@ -1,5 +1,5 @@
 const featureOrder = ["files", "clips", "search", "stack", "pin", "recent", "drop"];
-const touchbarAssetVersion = "touchbar-20260907-release-text-001";
+const touchbarAssetVersion = "touchbar-20260908-highlight-once-001";
 
 function touchbarAsset(path) {
   return `${path}?v=${touchbarAssetVersion}`;
@@ -512,6 +512,7 @@ function armHighlighter() {
 
   const mask = trigger.querySelector(".highlighter-mask-rect");
   let drawFrame = 0;
+  let hasDrawn = false;
 
   const setHighlightProgress = progress => {
     if (!mask) return;
@@ -521,7 +522,8 @@ function armHighlighter() {
   const easeHighlight = progress => 1 - Math.pow(1 - progress, 4);
 
   const draw = () => {
-    if (!mask) return;
+    if (!mask || hasDrawn) return;
+    hasDrawn = true;
     window.cancelAnimationFrame(drawFrame);
     setHighlightProgress(0);
     trigger.classList.remove("is-drawn");
@@ -560,15 +562,13 @@ function armHighlighter() {
     entries => {
       if (entries.some(entry => entry.isIntersecting)) {
         draw();
+        highlightObserver.disconnect();
       }
     },
     { rootMargin: "0px 0px -30% 0px", threshold: 0.01 }
   );
 
   highlightObserver.observe(trigger);
-
-  trigger.addEventListener("pointerenter", draw);
-  trigger.addEventListener("focusin", draw);
 }
 
 function armCarousel() {
