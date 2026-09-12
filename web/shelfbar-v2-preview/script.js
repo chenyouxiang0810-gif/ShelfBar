@@ -1,4 +1,5 @@
 const featureOrder = ["files", "clips", "search", "stack", "pin", "recent", "drop"];
+const storyFeatureOrder = ["files", "search", "stack", "pin", "clips", "recent"];
 const touchbarAssetVersion = "touchbar-20260908-highlight-once-001";
 
 function touchbarAsset(path) {
@@ -12,9 +13,9 @@ const featureData = {
     headline: "Files stay close.",
     copy: "Drop files into ShelfBar and reopen them from the Touch Bar without breaking the app you are in.",
     storyLines: [
-      "Drop files into ShelfBar.",
-      "Keep them parked on the Touch Bar.",
-      "Reopen them without breaking flow."
+      "Drop a file once, and it's always within reach.",
+      "ShelfBar keeps the files you're working on directly on the Touch Bar,",
+      "so you can jump back into your work without opening Finder or searching through folders."
     ],
     image: touchbarAsset("assets/touchbar/files.png"),
     appImage: "assets/app-pages/shelf.png",
@@ -23,12 +24,12 @@ const featureData = {
   clips: {
     eyebrow: "Clips",
     title: "Clips.",
-    headline: "Clipboard text gets its own shelf.",
+    headline: "Your clipboard, remembered.",
     copy: "Keep useful snippets beside your files, with paste actions that stay one touch away.",
     storyLines: [
-      "Copy text, links, or images.",
-      "ShelfBar keeps them beside your files.",
-      "Paste actions stay one touch away."
+      "Copy more than just text.",
+      "ShelfBar keeps your recent clipboard history close by,",
+      "making it easy to reuse images, links, and snippets without switching between apps."
     ],
     image: touchbarAsset("assets/touchbar/clips.png"),
     appImage: "assets/app-pages/features.png",
@@ -37,12 +38,12 @@ const featureData = {
   search: {
     eyebrow: "Search",
     title: "Search.",
-    headline: "Search without opening another window.",
+    headline: "Search in a touch.",
     copy: "Type, narrow, clear, and close from the strip while the app window stays quiet.",
     storyLines: [
-      "Start searching from the Touch Bar.",
-      "Type to narrow the shelf.",
-      "Clear or close without opening another window."
+      "Finding a file shouldn't interrupt your workflow.",
+      "Type a few letters, see instant results, and open what you need right from the Touch Bar",
+      "without leaving the app you're using."
     ],
     image: touchbarAsset("assets/touchbar/search.png"),
     appImage: "assets/app-pages/features.png",
@@ -51,12 +52,12 @@ const featureData = {
   stack: {
     eyebrow: "Stack",
     title: "Stack.",
-    headline: "Stacks make clutter compact.",
+    headline: "Organize naturally.",
     copy: "Group related files together on the Touch Bar without turning the shelf into a folder maze.",
     storyLines: [
-      "Drag related files together.",
-      "ShelfBar folds them into a compact stack.",
-      "The shelf stays clean without becoming a folder maze."
+      "As your workspace grows, ShelfBar keeps everything organized.",
+      "Drag files together to create stacks, group related items,",
+      "and arrange them the way that feels most natural to you."
     ],
     image: touchbarAsset("assets/touchbar/stack.png"),
     appImage: "assets/app-pages/shelf.png",
@@ -65,12 +66,12 @@ const featureData = {
   pin: {
     eyebrow: "Pin",
     title: "Pin.",
-    headline: "Pin what should not move.",
+    headline: "Keep favorites pinned.",
     copy: "Important files stay at the front while the rest of the shelf keeps changing around them.",
     storyLines: [
-      "Pin the items that matter.",
-      "They stay at the front.",
-      "The rest of the shelf keeps moving around them."
+      "Some files are always important.",
+      "Pin them once and they'll stay exactly where you expect them,",
+      "ready whenever you need them throughout the day."
     ],
     image: touchbarAsset("assets/touchbar/pin.png"),
     appImage: "assets/app-pages/features.png",
@@ -79,12 +80,11 @@ const featureData = {
   recent: {
     eyebrow: "Recent",
     title: "Recent.",
-    headline: "Recent work is one touch away.",
+    headline: "Continue where you left off.",
     copy: "Jump back to files and clipboard entries you just used without opening a separate history view.",
     storyLines: [
-      "Recent work stays reachable.",
-      "Files and clips return in one gesture.",
-      "No separate history window required."
+      "Your recent files appear automatically, so you can return to unfinished work in a single touch.",
+      "Spend less time searching and more time creating."
     ],
     image: touchbarAsset("assets/touchbar/recent.png"),
     appImage: "assets/app-pages/shelf.png",
@@ -381,11 +381,11 @@ function updateStoryFeature() {
   const rect = story.getBoundingClientRect();
   const travel = Math.max(1, rect.height - window.innerHeight);
   const progress = clamp(-rect.top / travel);
-  const index = Math.min(featureOrder.length - 1, Math.floor(progress * featureOrder.length));
-  const key = featureOrder[index];
+  const index = Math.min(storyFeatureOrder.length - 1, Math.floor(progress * storyFeatureOrder.length));
+  const key = storyFeatureOrder[index];
   const feature = getFeature(key);
   const lineItems = feature.storyLines || [feature.copy];
-  const featureProgress = clamp(progress * featureOrder.length - index);
+  const featureProgress = clamp(progress * storyFeatureOrder.length - index);
   const featureChanged = key !== storyFeatureKey;
 
   document.documentElement.style.setProperty("--story-progress", progress.toFixed(3));
