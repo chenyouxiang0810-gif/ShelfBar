@@ -535,7 +535,7 @@ button {
 .highlight .highlights-stage {
   position: relative;
   width: min(100%, 1580px);
-  margin: clamp(28px, 4vw, 48px) auto 0;
+  margin: clamp(16px, 2.8vw, 30px) auto 0;
 }
 
 .carousel-viewport {
@@ -554,10 +554,10 @@ button {
     "product";
   align-items: center;
   justify-items: center;
-  gap: clamp(20px, 3.2vw, 38px);
+  gap: clamp(14px, 2.2vw, 26px);
   min-height: 0;
-  padding: clamp(24px, 4vw, 44px);
-  padding-bottom: clamp(90px, 7vw, 112px);
+  padding: clamp(18px, 3vw, 30px);
+  padding-bottom: clamp(74px, 5.5vw, 88px);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background:
@@ -680,7 +680,7 @@ button {
 
 .carousel-product .stage-app {
   grid-area: product;
-  width: min(100%, 760px);
+  width: min(100%, 390px);
 }
 
 .carousel-panel > .carousel-product {
@@ -740,19 +740,18 @@ button {
 
 .circle-button::before {
   content: "";
-  width: 0;
-  height: 0;
-  border-top: 7px solid transparent;
-  border-bottom: 7px solid transparent;
+  width: 13px;
+  height: 15px;
+  background: currentColor;
 }
 
 .circle-button[data-carousel-prev]::before {
-  border-right: 10px solid currentColor;
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
   transform: translateX(-1px);
 }
 
 .circle-button[data-carousel-next]::before {
-  border-left: 10px solid currentColor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
   transform: translateX(1px);
 }
 
@@ -1426,6 +1425,10 @@ button {
   .carousel-panel {
     padding: clamp(16px, 5vw, 24px);
     padding-bottom: 84px;
+  }
+
+  .carousel-product .stage-app {
+    width: min(100%, 250px);
   }
 
   .carousel-copy h3,
