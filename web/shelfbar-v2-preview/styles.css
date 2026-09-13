@@ -534,7 +534,7 @@ button {
 
 .highlight .highlights-stage {
   position: relative;
-  width: min(100%, 1580px);
+  width: min(100%, 1280px);
   margin: clamp(16px, 2.8vw, 30px) auto 0;
 }
 
@@ -605,6 +605,7 @@ button {
 }
 
 .highlight .carousel-copy .eyebrow {
+  display: none;
   color: var(--muted);
 }
 
@@ -675,7 +676,7 @@ button {
 
 .carousel-product .stage-touchbar {
   grid-area: bar;
-  width: min(100%, 2008px);
+  width: min(66.666%, 1339px);
 }
 
 .carousel-product .stage-app {
