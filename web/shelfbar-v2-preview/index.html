@@ -9,7 +9,7 @@
       content="ShelfBar turns the Touch Bar into a workspace for files, clips, search, stacks, and pinned work."
     >
     <link rel="icon" href="assets/shelfbar-brand-dark.png">
-    <link rel="stylesheet" href="styles.css?v=touchbar-20260913-highlight-fit-002">
+    <link rel="stylesheet" href="styles.css?v=touchbar-20261003-apple-touchbar-nav-001">
   </head>
   <body>
     <header class="site-header" aria-label="ShelfBar navigation">
@@ -98,13 +98,15 @@
             </div>
 
             <div class="carousel-controls" aria-label="Highlight playback">
-              <button class="circle-button" type="button" data-carousel-prev aria-label="Previous highlight"><span aria-hidden="true"></span></button>
+              <div class="carousel-progress-pill">
+                <button class="circle-button" type="button" data-carousel-prev aria-label="Previous highlight"><span aria-hidden="true"></span></button>
+                <div class="progress-track" aria-hidden="true"><span data-carousel-progress></span></div>
+                <button class="circle-button" type="button" data-carousel-next aria-label="Next highlight"><span aria-hidden="true"></span></button>
+              </div>
               <button class="play-button" type="button" data-carousel-toggle aria-label="Pause highlights">
                 <span class="playback-icon" aria-hidden="true"></span>
                 <span data-carousel-state>Pause</span>
               </button>
-              <button class="circle-button" type="button" data-carousel-next aria-label="Next highlight"><span aria-hidden="true"></span></button>
-              <div class="progress-track" aria-hidden="true"><span data-carousel-progress></span></div>
             </div>
           </div>
         </div>
