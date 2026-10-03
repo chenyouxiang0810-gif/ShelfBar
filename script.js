@@ -342,7 +342,10 @@ async function updateCarousel(index, direction = 1) {
   if (eyebrow) eyebrow.textContent = feature.eyebrow;
   if (title) title.textContent = feature.title;
   if (copy) copy.textContent = feature.copy;
-  if (progress) progress.style.width = `${((carouselIndex + 1) / featureOrder.length) * 100}%`;
+  if (progress) {
+    progress.style.setProperty("--carousel-index", String(carouselIndex));
+    progress.style.setProperty("--carousel-count", String(featureOrder.length));
+  }
   if (stage) applyFeatureToStage(stage, featureKey);
   runSlide?.();
 }

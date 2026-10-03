@@ -72,24 +72,43 @@ button {
 
 .site-header {
   position: sticky;
-  top: 14px;
+  top: 12px;
   z-index: 20;
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 10px;
+  gap: clamp(8px, 1.2vw, 16px);
   align-items: center;
-  width: min(calc(100% - (var(--gutter) * 2)), 1360px);
-  min-height: 62px;
-  margin: 14px auto 0;
-  padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 999px;
-  background: #030303;
+  width: min(calc(100% - (var(--gutter) * 2)), 1420px);
+  min-height: 60px;
+  margin: 12px auto 0;
+  padding: 0 clamp(10px, 1.2vw, 16px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: #000;
   box-shadow:
-    0 24px 90px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    0 22px 70px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.025),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(26px);
   -webkit-backdrop-filter: blur(26px);
+}
+
+.site-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(90deg, transparent 0 14%, rgba(255, 255, 255, 0.05) 34%, transparent 56%),
+    url("assets/touchbar/recent.png?v=touchbar-20260912-recent-touchbar-001") center / cover no-repeat;
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+.site-header > * {
+  position: relative;
+  z-index: 1;
 }
 
 .brand,
@@ -102,14 +121,17 @@ button {
 }
 
 .brand {
-  gap: 12px;
+  gap: 11px;
   justify-self: start;
   font-size: 17px;
   font-weight: 700;
   min-height: 44px;
   padding: 0 16px 0 10px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(48, 48, 50, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .brand img {
@@ -121,9 +143,9 @@ button {
 .nav-links {
   gap: 8px;
   justify-self: center;
-  color: rgba(245, 245, 247, 0.76);
+  color: rgba(245, 245, 247, 0.78);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .nav-links a,
@@ -135,32 +157,38 @@ button {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 18px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.13);
+  padding: 0 clamp(14px, 1.8vw, 24px);
+  border-radius: 10px;
+  background: rgba(48, 48, 50, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .nav-links a:hover,
 .nav-links a:focus-visible {
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.20);
+  background: rgba(66, 66, 69, 0.98);
 }
 
 .nav-cta {
   justify-self: end;
   min-height: 44px;
-  padding: 0 20px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.13);
+  padding: 0 clamp(18px, 2.2vw, 30px);
+  border-radius: 10px;
+  background: rgba(48, 48, 50, 0.94);
   color: var(--ink);
   font-size: 15px;
   font-weight: 700;
   line-height: 44px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .nav-cta:hover,
 .nav-cta:focus-visible {
-  background: rgba(255, 255, 255, 0.20);
+  background: rgba(66, 66, 69, 0.98);
 }
 
 .nav-cta:hover,
@@ -506,7 +534,7 @@ button {
 .highlight-title-wrap h2 {
   margin: 0;
   color: #1d1d1f;
-  font-size: clamp(46px, 6vw, 76px);
+  font-size: clamp(48px, 5.6vw, 72px);
   font-weight: 800;
   line-height: 1.03;
   letter-spacing: 0;
@@ -640,7 +668,7 @@ button {
 .carousel-copy h3,
 .story-copy h2 {
   margin: 0;
-  font-size: clamp(34px, 4vw, 54px);
+  font-size: clamp(38px, 4.8vw, 64px);
   font-weight: 800;
   line-height: 1.04;
   letter-spacing: 0;
@@ -724,29 +752,29 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
   opacity: 0;
-  transform: translateX(-50%) translateY(26px) scale(0.76);
+  transform: translateX(-50%) translateY(34px) scale(0.44);
   transform-origin: center;
   will-change: transform, opacity;
 }
 
 .highlights-stage.controls-ready .carousel-controls {
-  animation: controlsBallOpen 980ms cubic-bezier(0.18, 1.34, 0.32, 1) both;
+  animation: controlsBallOpen 860ms cubic-bezier(0.18, 1.12, 0.28, 1) both;
 }
 
 .carousel-progress-pill {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 58px;
-  padding: 7px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  gap: 14px;
+  min-height: 54px;
+  padding: 8px 14px;
+  border: 0;
   border-radius: 999px;
-  background: rgba(32, 32, 35, 0.82);
+  background: rgba(32, 32, 35, 0.88);
   box-shadow:
-    0 22px 70px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    0 18px 48px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
 }
@@ -801,10 +829,10 @@ button {
   min-height: 58px;
   padding: 0;
   border-radius: 50%;
-  background: rgba(32, 32, 35, 0.86);
+  background: rgba(32, 32, 35, 0.90);
   box-shadow:
-    0 22px 70px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    0 18px 48px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
   font-size: 15px;
   font-weight: 700;
   backdrop-filter: blur(22px);
@@ -838,21 +866,29 @@ button {
 }
 
 .progress-track {
+  --dot-step: 22px;
+  --dot-size: 8px;
+  --active-pill-width: 31px;
   flex: 0 1 auto;
-  width: clamp(118px, 12vw, 178px);
-  height: 8px;
-  overflow: hidden;
+  position: relative;
+  width: calc(var(--active-pill-width) + (6 * var(--dot-step)));
+  height: 14px;
+  overflow: visible;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background:
+    radial-gradient(circle, rgba(245, 245, 247, 0.38) 0 calc(var(--dot-size) / 2), transparent calc((var(--dot-size) / 2) + 0.5px))
+    left center / var(--dot-step) 100% repeat-x;
 }
 
 .progress-track span {
   display: block;
-  width: 0%;
-  height: 100%;
+  width: var(--active-pill-width);
+  height: 8px;
+  margin-top: 3px;
   border-radius: inherit;
   background: #f5f5f7;
-  transition: width 520ms var(--ease);
+  transform: translateX(calc(var(--carousel-index, 0) * var(--dot-step)));
+  transition: transform 520ms var(--ease);
 }
 
 @keyframes carouselEnterNext {
@@ -894,15 +930,15 @@ button {
 @keyframes controlsBallOpen {
   0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(30px) scale(0.78);
+    transform: translateX(-50%) translateY(36px) scale(0.34);
   }
-  34% {
+  38% {
     opacity: 1;
-    transform: translateX(-50%) translateY(-10px) scale(1.05);
+    transform: translateX(-50%) translateY(-8px) scale(0.58);
   }
-  58% {
+  68% {
     opacity: 1;
-    transform: translateX(-50%) translateY(2px) scale(0.96);
+    transform: translateX(-50%) translateY(3px) scaleX(1.08) scaleY(0.96);
   }
   100% {
     opacity: 1;
